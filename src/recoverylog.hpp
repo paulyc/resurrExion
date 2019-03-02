@@ -30,10 +30,12 @@
 
 #include <string>
 #include <fstream>
-#include <locale>
-#include <codecvt>
 #include <functional>
 #include <variant>
+#include <locale>
+#include <codecvt>
+
+#include "filesystem.hpp"
 
 namespace io {
 namespace github {
@@ -54,38 +56,39 @@ static constexpr size_t start_offset_sector = start_offset_bytes / sector_size_b
 
 class RecoveryLogBase {
 public:
-    RecoveryLogBase() {}
+    RecoveryLogBase(const std::string &filename) : _filename(filename) {}
     virtual ~RecoveryLogBase() {}
 
-protected:
-    std::string convert_utf16_to_utf8(uint8_t *fh, int namelen);
+    static constexpr int32_t BadSectorFlag = -1;
 
+protected:
+    std::string _convert_utf16_to_utf8(uint8_t *fh, int namelen);
+
+    std::string _filename;
     std::wstring_convert<std::codecvt_utf8_utf16<char16_t>, char16_t> _cvt;
 };
 
 class RecoveryLogReader : public RecoveryLogBase {
 public:
-    RecoveryLogReader(const std::string &filename) : _logfile(filename) {}
+    RecoveryLogReader(const std::string &filename) : RecoveryLogBase(filename), _logfile(filename) {}
     virtual ~RecoveryLogReader() {}
 
     void parse(const std::string &devfilename, const std::string &logfilename, const std::string &outdir);
-    void parseTextLog(std::function<void(size_t, std::variant<std::string, std::exception, bool>)>);
+    void parseTextLog(io::github::paulyc::ExFATRestore::ExFATFilesystem &fs, std::function<void(size_t, std::variant<std::string, std::exception, bool>)>);
 private:
     std::ifstream _logfile;
 };
 
 class RecoveryLogWriter : public RecoveryLogBase {
 public:
-    RecoveryLogWriter(const std::string &filename) : _filename(filename) {}
+    RecoveryLogWriter(const std::string &filename) : RecoveryLogBase(filename) {}
     virtual ~RecoveryLogWriter() {}
 
-    void writeLog(const std::string &devfilename, const std::string &logfilename);
-    void textLogToBinLog(const std::string &textlogfilename, const std::string &binlogfilename);
-protected:
-    static constexpr int32_t BadSectorFlag = -1;
+    void writeToBinLog(const char *buf, size_t count) { _binlog.write(buf, count); }
 
-    std::string _filename;
-    std::ofstream _logfile;
+    void writeTextLog(const std::string &devfilename, const std::string &logfilename);
+
+protected:
     std::ofstream _binlog;
 };
 

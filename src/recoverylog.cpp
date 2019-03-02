@@ -39,6 +39,7 @@
 #include <unistd.h>
 
 void io::github::paulyc::ExFATRestore::RecoveryLogReader::parseTextLog(
+    io::github::paulyc::ExFATRestore::ExFATFilesystem &fs,
     std::function<void(size_t, std::variant<std::string, std::exception, bool>)> cb)
 {
     std::regex fde("FDE ([0-9a-fA-F]{16})(?: (.*))?");
@@ -52,6 +53,7 @@ void io::github::paulyc::ExFATRestore::RecoveryLogReader::parseTextLog(
             filename = sm[2];
             try {
                 offset = std::stol(sm[1], nullptr, 16);
+                std::shared_ptr<ExFATFilesystem::BaseEntry> ent = fs.loadEntry(offset);
                 cb(offset, std::variant<std::string, std::exception, bool>(filename));
             } catch (std::exception &ex) {
                 std::cerr << "Writing file entry to binlog, got exception: " << typeid(ex).name() << " with msg: " << ex.what() << std::endl;
@@ -79,7 +81,7 @@ void io::github::paulyc::ExFATRestore::RecoveryLogReader::parseTextLog(
 constexpr int exfat_filename_maxlen = 256;
 constexpr int exfat_filename_maxlen_utf8 = exfat_filename_maxlen * 2;
 
-std::string io::github::paulyc::ExFATRestore::RecoveryLogBase::convert_utf16_to_utf8(uint8_t *fh, int namelen)
+std::string io::github::paulyc::ExFATRestore::RecoveryLogBase::_convert_utf16_to_utf8(uint8_t *fh, int namelen)
 {
     struct fs_file_directory_entry *fde = (struct fs_file_directory_entry *)fh;
     const int continuations = fde->continuations;
@@ -92,7 +94,7 @@ std::string io::github::paulyc::ExFATRestore::RecoveryLogBase::convert_utf16_to_
                 if (u16s.length() == namelen) {
                     return _cvt.to_bytes(u16s);
                 } else {
-                    u16s += n->name[i];
+                    u16s.push_back(n->name[i]);
                 }
             }
         }
@@ -100,7 +102,7 @@ std::string io::github::paulyc::ExFATRestore::RecoveryLogBase::convert_utf16_to_
     return _cvt.to_bytes(u16s);
 }
 
-void io::github::paulyc::ExFATRestore::RecoveryLogWriter::writeLog(
+void io::github::paulyc::ExFATRestore::RecoveryLogWriter::writeTextLog(
     const std::string &devfilename,
     const std::string &logfilename)
 {
@@ -201,75 +203,4 @@ void io::github::paulyc::ExFATRestore::RecoveryLogWriter::writeLog(
 #endif
 }
 
-constexpr int32_t io::github::paulyc::ExFATRestore::RecoveryLogWriter::BadSectorFlag;
-
-/**
- * binlog format:
- * 64-bit unsigned int, disk offset of byte in record or sector
- * 32-bit int, number of bytes in record, OR -1 if bad sector
- * variable bytes equal to number of bytes in record
- */
-void io::github::paulyc::ExFATRestore::RecoveryLogWriter::textLogToBinLog(
-    const std::string &textlogfilename,
-    const std::string &binlogfilename)
-{
-    std::ifstream textlog(textlogfilename);
-    std::ofstream binlog(binlogfilename, std::ios::binary | std::ios::trunc);
-
-    io::github::paulyc::ExFATRestore::RecoveryLogReader reader(textlogfilename);
-
-#if 1
-    BP_ASSERT(false, "Don't call this");
-#else
-    reader.parseTextLog([this, &binlog](size_t offset, std::variant<std::string, std::exception, bool> entry_info) {
-        if (std::holds_alternative<std::string>(entry_info)) {
-            // File entry
-            BP_ASSERT(false, "Don't call this");
-            binlog.write((const char *)&offset, sizeof(size_t));
-            binlog.write((const char *)&entries_size_bytes, sizeof(int32_t));
-            binlog.write((const char*)ptr, entries_size_bytes);
-        } else if (std::holds_alternative<bool>(entry_info)) {
-            // Bad sector
-            binlog.write((const char *)&offset, sizeof(size_t));
-            binlog.write((const char *)&BadSectorFlag, sizeof(int32_t));
-        } else {
-            // Exception
-            std::exception &ex = std::get<std::exception>(entry_info);
-            std::cerr << "entry_info had " << typeid(ex).name() << " with message: " << ex.what() << std::endl;
-        }
-    });
-#endif
-#if 0
-    std::regex fde("FDE ([0-9a-fA-F]{16})(?: (.*))?");
-    std::regex badsector("BAD_SECTOR ([0-9a-fA-F]{16})");
-
-    for (std::string line; std::getline(textlog, line); ) {
-        std::smatch sm;
-        if (std::regex_match(line, sm, fde)) {
-            size_t offset;
-            std::string filename;
-            filename = sm[2];
-            try {
-                offset = std::stol(sm[1], nullptr, 16);
-                _writeBinlogFileEntry(dev, offset, binlog);
-            } catch (std::exception &ex) {
-                std::cerr << "Writing file entry to binlog, got exception: " << typeid(ex).name() << " with msg: " << ex.what() << std::endl;
-                std::cerr << "Invalid textlog FDE line, skipping: " << line << std::endl;
-            }
-        } else if (std::regex_match(line, sm, badsector)) {
-            int32_t bad_sector_flag;
-            size_t offset;
-            try {
-                offset = std::stol(sm[1], nullptr, 16);
-                binlog.write((const char *)&offset, sizeof(size_t));
-                binlog.write((const char *)&BadSectorFlag, sizeof(int32_t));
-            } catch (std::exception &ex) {
-                std::cerr << "Writing bad sector to binlog, got exception " << typeid(ex).name() << " with msg: " << ex.what() << std::endl;
-                std::cerr << "Invalid textlog BAD_SECTOR line, skipping: " << line << std::endl;
-            }
-        } else {
-            std::cerr << "Unknown textlog line format: " << line << std::endl;
-        }
-    }
-#endif
-}
+constexpr int32_t io::github::paulyc::ExFATRestore::RecoveryLogBase::BadSectorFlag;

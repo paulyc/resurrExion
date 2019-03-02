@@ -101,7 +101,7 @@ struct fs_stream_extension_entry {
     uint16_t name_hash;
     uint16_t reserved2;
     uint64_t valid_size;
-    uint64_t reserved3;
+    uint32_t reserved3;
     uint32_t start_cluster;
     uint64_t size;
 } __attribute__((packed));
@@ -131,6 +131,7 @@ public:
         BaseEntry(void *entry_start, int num_entries);
         virtual ~BaseEntry() {}
 
+        int get_file_info_size() const { return _num_entries * sizeof(struct fs_entry); }
         uint32_t get_start_cluster() const { return ((struct fs_stream_extension_entry *)(_fs_entries + 1))->start_cluster; }
         uint64_t get_size() const { return ((struct fs_stream_extension_entry *)(_fs_entries + 1))->size; }
     protected:
@@ -155,6 +156,8 @@ public:
     std::shared_ptr<BaseEntry> loadEntry(size_t entry_offset);
 
     void restore_all_files(const std::string &restore_dir_name, const std::string &textlogfilename);
+
+    void textLogToBinLog(const std::string &textlogfilename, const std::string &binlogfilename);
 
 private:
     int _fd;
