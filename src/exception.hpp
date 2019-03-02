@@ -31,6 +31,7 @@
 #include <string>
 #include <exception>
 #include <iostream>
+#include <string.h>
 
 inline void bpAssert(bool test, std::string msg)
 {
@@ -59,6 +60,16 @@ public:
     virtual const char* what() const noexcept { return _msg.c_str(); }
 private:
     std::string _msg;
+};
+
+class posix_exception : public std::exception {
+public:
+    posix_exception(int errno_) : _errno(errno_) {}
+    virtual ~posix_exception() {}
+
+    virtual const char *what() const noexcept { return strerror(_errno); }
+private:
+    int _errno;
 };
 
 }

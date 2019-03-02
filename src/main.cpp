@@ -27,10 +27,19 @@
 
 #include <iostream>
 
-#include "recovery.hpp"
+#include "filesystem.hpp"
 
 int main(int argc, const char * argv[]) {
 #if 1
+    try {
+        io::github::paulyc::ExFATRestore::ExFATFilesystem fs("/dev/sdb", 4000000000000);
+    } catch (std::exception &ex) {
+        std::cerr << "Exception " << typeid(ex).name() << " caught: " << ex.what() << std::endl;
+        return -2;
+    }
+#endif
+
+#if 0
     if (argc != 4) {
         std::cerr << "usage: " << argv[0] << " <device> <logfile> <output_dir>" << std::endl;
         return -1;

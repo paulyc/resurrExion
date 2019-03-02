@@ -54,30 +54,39 @@ static constexpr size_t start_offset_sector = start_offset_bytes / sector_size_b
 
 class RecoveryLogBase {
 public:
-    void parseTextLog(std::ifstream &dev, std::ifstream &textlog, std::function<void(size_t, std::variant<std::string, std::exception, bool>)>);
+    RecoveryLogBase() {}
+    virtual ~RecoveryLogBase() {}
 
 protected:
     std::string convert_utf16_to_utf8(uint8_t *fh, int namelen);
 
     std::wstring_convert<std::codecvt_utf8_utf16<char16_t>, char16_t> _cvt;
-
 };
 
 class RecoveryLogReader : public RecoveryLogBase {
 public:
-    void parse(const std::string &devfilename, const std::string &logfilename, const std::string &outdir);
+    RecoveryLogReader(const std::string &filename) : _logfile(filename) {}
+    virtual ~RecoveryLogReader() {}
 
+    void parse(const std::string &devfilename, const std::string &logfilename, const std::string &outdir);
+    void parseTextLog(std::function<void(size_t, std::variant<std::string, std::exception, bool>)>);
 private:
-    void _processFDE(std::ifstream &dev, size_t offset, const std::string &outdir);
+    std::ifstream _logfile;
 };
 
 class RecoveryLogWriter : public RecoveryLogBase {
 public:
+    RecoveryLogWriter(const std::string &filename) : _filename(filename) {}
+    virtual ~RecoveryLogWriter() {}
+
     void writeLog(const std::string &devfilename, const std::string &logfilename);
-    void textLogToBinLog(const std::string &devfilename, const std::string &textlogfilename, const std::string &binlogfilename);
+    void textLogToBinLog(const std::string &textlogfilename, const std::string &binlogfilename);
 protected:
     static constexpr int32_t BadSectorFlag = -1;
-    void _writeBinlogFileEntry(std::ifstream &dev, size_t offset, std::ofstream &binlog);
+
+    std::string _filename;
+    std::ofstream _logfile;
+    std::ofstream _binlog;
 };
 
 }

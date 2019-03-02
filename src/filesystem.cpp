@@ -25,46 +25,126 @@
 //  SOFTWARE.
 //
 
+#include <sys/mman.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <unistd.h>
+
+#include <variant>
+#include <memory>
+
 #include "filesystem.hpp"
+#include "exception.hpp"
+#include "recoverylog.hpp"
 
-/**
- * if valid, return bytes in entry
- * if invalid, return -1
- */
-bool io::github::paulyc::ExFATRestore::ExFATFilesystem::verifyFileEntry(
-    uint8_t *buf,
-    size_t bufSize,
-    int &file_info_size,
-    struct fs_file_directory_entry *&m1,
-    struct fs_stream_extension_directory_entry *&m2)
+using io::github::paulyc::ExFATRestore::ExFATFilesystem;
+
+io::github::paulyc::ExFATRestore::ExFATFilesystem::ExFATFilesystem(const char *devname, size_t devsize) :
+    _fd(-1),
+    _mmap((uint8_t*)MAP_FAILED),
+    _devsize(devsize)
 {
-    if (buf[0] == FILE_INFO1 && buf[32] == FILE_INFO2) {
-        m1 = (struct fs_file_directory_entry*)(buf);
-        m2 = (struct fs_stream_extension_directory_entry*)(buf+32);
-        const int continuations = m1->continuations;
-        if (continuations >= 2 && continuations <= 18) {
-            int i;
-            file_info_size = (continuations + 1) * 32;
-            uint16_t chksum = 0;
-            if (bufSize < file_info_size) {
-                return false;
-            }
+    _fd = open(devname, O_RDONLY);
+    if (_fd == -1) {
+        throw io::github::paulyc::ExFATRestore::posix_exception(errno);
+    }
 
-            for (i = 0; i < 32; ++i) {
-                if (i != 2 && i != 3) {
-                    chksum = ((chksum << 15) | (chksum >> 1)) + buf[i];
-                }
-            }
+    _mmap = (uint8_t*)mmap(0, _devsize, PROT_READ, MAP_PRIVATE, _fd, 0);
+    if (_mmap == (uint8_t*)MAP_FAILED) {
+        throw io::github::paulyc::ExFATRestore::posix_exception(errno);
+    }
+}
 
-            for (; i < file_info_size; ++i) {
-                chksum = ((chksum << 15) | (chksum >> 1)) + buf[i];
-            }
+io::github::paulyc::ExFATRestore::ExFATFilesystem::~ExFATFilesystem()
+{
+    if (_mmap != MAP_FAILED) {
+        munmap(_mmap, _devsize);
+    }
 
-            if (chksum == m1->checksum) {
-                return file_info_size;
-            }
+    if (_fd != -1) {
+        close(_fd);
+    }
+}
+
+std::shared_ptr<ExFATFilesystem::BaseEntry> io::github::paulyc::ExFATRestore::ExFATFilesystem::loadEntry(size_t entry_offset)
+{
+    uint8_t *buf = (uint8_t *)(_mmap + entry_offset);
+    struct fs_file_directory_entry *fde = (struct fs_file_directory_entry*)(buf);
+    struct fs_stream_extension_entry *streamext = (struct fs_stream_extension_entry*)(buf+32);
+
+    if (fde->type != FILE_INFO1 || streamext->type != FILE_INFO2) {
+        return std::shared_ptr<ExFATFilesystem::BaseEntry>();
+    }
+
+    const int continuations = fde->continuations;
+    if (continuations < 2 || continuations > 18) {
+        return std::shared_ptr<ExFATFilesystem::BaseEntry>();
+    }
+
+    int i;
+    uint16_t chksum = 0;
+
+    for (i = 0; i < 32; ++i) {
+        if (i != 2 && i != 3) {
+            chksum = ((chksum << 15) | (chksum >> 1)) + buf[i];
         }
     }
 
-    return false;
+    for (; i < continuations * sizeof(struct fs_entry); ++i) {
+        chksum = ((chksum << 15) | (chksum >> 1)) + buf[i];
+    }
+
+    if (chksum != fde->checksum) {
+        return std::shared_ptr<ExFATFilesystem::BaseEntry>();
+    }
+
+    if (fde->attrib & DIR) {
+        return std::make_shared<ExFATFilesystem::DirectoryEntry>(buf, continuations + 1);
+    } else {
+        return std::make_shared<ExFATFilesystem::FileEntry>(buf, continuations + 1);
+    }
+}
+
+io::github::paulyc::ExFATRestore::ExFATFilesystem::BaseEntry::BaseEntry(void *entry_start, int num_entries)
+{
+    _fs_entries = (struct fs_entry *)entry_start;
+    _num_entries = num_entries;
+}
+
+void io::github::paulyc::ExFATRestore::ExFATFilesystem::restore_all_files(const std::string &restore_dir_name, const std::string &textlogfilename)
+{
+    io::github::paulyc::ExFATRestore::RecoveryLogReader reader(textlogfilename);
+
+    reader.parseTextLog([this, &restore_dir_name](size_t offset, std::variant<std::string, std::exception, bool> entry_info){
+        if (std::holds_alternative<std::string>(entry_info)) {
+            // File entry
+            const std::string filename = std::get<std::string>(entry_info);
+            std::shared_ptr<ExFATFilesystem::FileEntry> ent = std::dynamic_pointer_cast<ExFATFilesystem::FileEntry>(loadEntry(offset));
+                //std::shared_ptr<ExFATFilesystem::FileEntry>(dynamic_cast<ExFATFilesystem::FileEntry>(loadEntry(offset)));
+            if (!ent) {
+                std::cerr << "Invalid file entry at offset " << offset << std::endl;
+                return;
+            }
+            if (ent->is_contiguous()) {
+                std::ofstream restored_file(restore_dir_name + std::string("/") + filename, std::ios_base::binary);
+                const uint32_t start_cluster = ent->get_start_cluster();
+                const size_t file_offset = start_cluster * cluster_size_bytes + cluster_heap_disk_start_sector * sector_size_bytes;
+                const size_t file_size = ent->get_size();
+                std::cout << "recovering file " << filename <<
+                    " at cluster offset " << start_cluster <<
+                    " disk offset " << file_offset <<
+                    " size " << file_size << std::endl;
+                restored_file.write((const char *)(_mmap + file_offset), file_size);
+                restored_file.close();
+            } else {
+                std::cerr << "Non-contiguous file: " << filename << std::endl;
+            }
+        } else if (std::holds_alternative<bool>(entry_info)) {
+            // Bad sector, don't care
+        } else {
+            // Exception
+            std::exception &ex = std::get<std::exception>(entry_info);
+            std::cerr << "entry_info had " << typeid(ex).name() << " with message: " << ex.what() << std::endl;
+        }
+    });
 }

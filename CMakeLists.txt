@@ -14,5 +14,4 @@ add_executable(
 	src/filesystem.cpp
 	src/main.cpp
 	src/recoverylog.cpp
-	src/recovery.cpp
 )
