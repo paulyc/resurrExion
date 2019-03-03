@@ -4,7 +4,8 @@ Tool for restoring your ExFAT files and filesystem when you accidentally format 
 
 Unless of course the disk was encrypted, then the key would possibly be nuked and the data useless.
 Fortunately mine was not. Good reason not to blindly trust encryption: You're more likely to lock 
-yourself out than any malicious third-party.
+yourself out than any malicious third-party. I personally tend to favor encrypting individual files
+over a whole disk unless that disk is on a machine likely to be lost or stolen like a smartphone.
 
 mmap()s the whole disk into memory, this is a huge improvement over the naive read()ing and 
 buffering algorithms I was using before. mmap, it's like magic!
