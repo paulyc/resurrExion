@@ -25,12 +25,13 @@
 //  SOFTWARE.
 //
 
-#ifndef exception_hpp
-#define exception_hpp
+#ifndef _io_github_paulyc_exception_hpp_
+#define _io_github_paulyc_exception_hpp_
 
 #include <string>
 #include <exception>
 #include <iostream>
+#include <string.h>
 
 inline void bpAssert(bool test, std::string msg)
 {
@@ -49,21 +50,39 @@ inline void bpAssert(bool test, std::string msg)
 namespace io {
 namespace github {
 namespace paulyc {
-namespace ExFATRestore {
 
-class restore_error : public std::exception {
+class posix_exception : public std::exception {
 public:
-    restore_error(const std::string &msg) : _msg(msg) {}
-    virtual ~restore_error() {}
+    posix_exception(int errno_) : _errno(errno_) {}
+    virtual ~posix_exception() {}
+
+    virtual const char *what() const noexcept { return strerror(_errno); }
+private:
+    int _errno;
+};
+
+class string_exception : public std::exception {
+public:
+    string_exception(const std::string &msg) : _msg(msg) {}
+    virtual ~string_exception() {}
 
     virtual const char* what() const noexcept { return _msg.c_str(); }
 private:
     std::string _msg;
 };
 
+namespace ExFATRestore {
+
+class restore_error : public string_exception {
+public:
+    restore_error(const std::string &msg) : string_exception(msg) {}
+    virtual ~restore_error() {}
+};
+
 }
+
 }
 }
 }
 
-#endif /* exception_hpp */
+#endif /* _io_github_paulyc_exception_hpp_ */

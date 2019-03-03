@@ -25,15 +25,17 @@
 //  SOFTWARE.
 //
 
-#ifndef recoverylog_hpp
-#define recoverylog_hpp
+#ifndef _io_github_paulyc_recoverylog_hpp_
+#define _io_github_paulyc_recoverylog_hpp_
 
 #include <string>
 #include <fstream>
-#include <locale>
-#include <codecvt>
 #include <functional>
 #include <variant>
+#include <locale>
+#include <codecvt>
+
+#include "filesystem.hpp"
 
 namespace io {
 namespace github {
@@ -52,32 +54,83 @@ static constexpr uint32_t start_offset_cluster = 0x00adb000;
 static constexpr size_t start_offset_bytes = start_offset_cluster * cluster_size_bytes;
 static constexpr size_t start_offset_sector = start_offset_bytes / sector_size_bytes;
 
-class RecoveryLogBase {
+class RecoveryLogBase
+{
 public:
-    void parseTextLog(std::ifstream &dev, std::ifstream &textlog, std::function<void(size_t, std::variant<std::string, std::exception, bool>)>);
+    RecoveryLogBase(const std::string &filename) : _filename(filename) {}
+    virtual ~RecoveryLogBase() {}
 
-protected:
-    std::string convert_utf16_to_utf8(uint8_t *fh, int namelen);
-
-    std::wstring_convert<std::codecvt_utf8_utf16<char16_t>, char16_t> _cvt;
-
-};
-
-class RecoveryLogReader : public RecoveryLogBase {
-public:
-    void parse(const std::string &devfilename, const std::string &logfilename, const std::string &outdir);
-
-private:
-    void _processFDE(std::ifstream &dev, size_t offset, const std::string &outdir);
-};
-
-class RecoveryLogWriter : public RecoveryLogBase {
-public:
-    void writeLog(const std::string &devfilename, const std::string &logfilename);
-    void textLogToBinLog(const std::string &devfilename, const std::string &textlogfilename, const std::string &binlogfilename);
-protected:
     static constexpr int32_t BadSectorFlag = -1;
-    void _writeBinlogFileEntry(std::ifstream &dev, size_t offset, std::ofstream &binlog);
+
+protected:
+    std::string _get_utf8_filename(uint8_t *fh, int namelen);
+
+    std::string _filename;
+    std::wstring_convert<std::codecvt_utf8_utf16<char16_t>, char16_t> _cvt;
+};
+
+class RecoveryLogReader : public RecoveryLogBase
+{
+public:
+    RecoveryLogReader(const std::string &filename) : RecoveryLogBase(filename) {}
+    virtual ~RecoveryLogReader() {}
+};
+
+class RecoveryLogTextReader : public RecoveryLogReader
+{
+public:
+    RecoveryLogTextReader(const std::string &filename) : RecoveryLogReader(filename), _logfile(filename) {}
+
+    void parseTextLog(ExFATFilesystem &fs, std::function<void(size_t, std::variant<std::string, std::exception, bool>)>);
+private:
+    std::ifstream _logfile;
+};
+
+class RecoveryLogBinaryReader : public RecoveryLogReader
+{
+public:
+    RecoveryLogBinaryReader(const std::string &filename) : RecoveryLogReader(filename), _logfile(filename, std::ios::binary) {}
+private:
+    std::ifstream _logfile;
+};
+
+class RecoveryLogWriter : public RecoveryLogBase
+{
+public:
+    RecoveryLogWriter(const std::string &filename) : RecoveryLogBase(filename) {}
+    virtual ~RecoveryLogWriter() {}
+};
+
+class RecoveryLogTextWriter : public RecoveryLogWriter
+{
+public:
+    RecoveryLogTextWriter(const std::string &filename) : RecoveryLogWriter(filename), _logfile(filename, std::ios::trunc) {}
+
+    void writeTextLog(const std::string &devfilename, const std::string &logfilename);
+private:
+    std::ofstream _logfile;
+};
+
+class RecoveryLogBinaryWriter : public RecoveryLogWriter
+{
+public:
+    RecoveryLogBinaryWriter(const std::string &filename) : RecoveryLogWriter(filename), _logfile(filename, std::ios::binary | std::ios::trunc) {}
+
+    void writeBadSectorToBinLog(size_t offset) {
+        _writeToBinLog((const char *)&offset, sizeof(size_t));
+        _writeToBinLog((const char *)&BadSectorFlag, sizeof(int32_t));
+    }
+
+    void writeEntityToBinLog(size_t offset, uint8_t *fde, std::shared_ptr<ExFATFilesystem::BaseEntity> entity) {
+        const int entries_size_bytes = entity->get_file_info_size();
+        _writeToBinLog((const char*)&offset, sizeof(size_t));
+        _writeToBinLog((const char*)&entries_size_bytes, sizeof(int32_t));
+        _writeToBinLog((const char*)fde, entries_size_bytes);
+    }
+private:
+    void _writeToBinLog(const char *buf, size_t count) { _logfile.write(buf, count); }
+
+    std::ofstream _logfile;
 };
 
 }
@@ -85,4 +138,4 @@ protected:
 }
 }
 
-#endif /* recoverylog_hpp */
+#endif /* _io_github_paulyc_recoverylog_hpp_ */

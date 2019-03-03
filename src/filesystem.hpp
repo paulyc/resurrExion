@@ -25,13 +25,15 @@
 //  SOFTWARE.
 //
 
-#ifndef filesystem_hpp
-#define filesystem_hpp
+#ifndef _io_github_paulyc_filesystem_hpp_
+#define _io_github_paulyc_filesystem_hpp_
 
 #include <stdint.h>
 #include <stddef.h>
 
 #include <fstream>
+#include <memory>
+#include <unordered_map>
 
 enum fs_entry_flags_t {
     VALID 		= 0x80,
@@ -90,11 +92,9 @@ struct fs_file_directory_entry {
     uint8_t atime_cs;
     uint64_t reserved2;
     uint8_t reserved3;
-
-    bool is_directory() const { return attrib & DIR; }
 } __attribute__((packed));
 
-struct fs_stream_extension_directory_entry {
+struct fs_stream_extension_entry {
 	uint8_t type;
     uint8_t flags;
     uint8_t reserved1;
@@ -102,11 +102,9 @@ struct fs_stream_extension_directory_entry {
     uint16_t name_hash;
     uint16_t reserved2;
     uint64_t valid_size;
-    uint64_t reserved3;
+    uint32_t reserved3;
     uint32_t start_cluster;
     uint64_t size;
-
-    bool is_contiguous() const { return flags & CONTIGUOUS; }
 } __attribute__((packed));
 
 constexpr int exfat_name_entry_size = 15;
@@ -125,12 +123,54 @@ namespace ExFATRestore {
 class ExFATFilesystem
 {
 public:
-    static bool verifyFileEntry(
-        uint8_t *buf,
-        size_t bufSize,
-        int &file_info_size,
-        struct fs_file_directory_entry *&m1,
-        struct fs_stream_extension_directory_entry *&m2);
+    ExFATFilesystem(const char *devname, size_t devsize);
+    virtual ~ExFATFilesystem();
+
+    class BaseEntity
+    {
+    public:
+        BaseEntity(void *entry_start, int num_entries);
+        virtual ~BaseEntity() {}
+
+        int get_file_info_size() const { return _num_entries * sizeof(struct fs_entry); }
+        uint32_t get_start_cluster() const { return ((struct fs_stream_extension_entry *)(_fs_entries + 1))->start_cluster; }
+        uint64_t get_size() const { return ((struct fs_stream_extension_entry *)(_fs_entries + 1))->size; }
+        std::string get_name() const;
+    protected:
+        struct fs_entry *_fs_entries;
+        int _num_entries;
+        std::shared_ptr<BaseEntity> _parent;
+    };
+
+    class FileEntity : public BaseEntity
+    {
+    public:
+        FileEntity(void *entry_start, int num_entries) : BaseEntity(entry_start, num_entries) {}
+
+        bool is_contiguous() const { return ((struct fs_stream_extension_entry *)(_fs_entries + 1))->flags & CONTIGUOUS; }
+    };
+
+    class DirectoryEntity : public BaseEntity
+    {
+    public:
+        DirectoryEntity(void *entry_start, int num_entries) : BaseEntity(entry_start, num_entries) {}
+    private:
+    };
+
+    std::shared_ptr<BaseEntity> loadEntity(size_t entry_offset);
+
+    void restore_all_files(const std::string &restore_dir_name, const std::string &textlogfilename);
+
+    void textLogToBinLog(const std::string &textlogfilename, const std::string &binlogfilename);
+
+private:
+    int _fd;
+    uint8_t *_mmap;
+    size_t _devsize;
+
+    std::unordered_map<uint8_t*, std::shared_ptr<BaseEntity>> _offset_to_entity_mapping;
+    //std::list<uint64_t> _bad_sector_list;
+    std::shared_ptr<DirectoryEntity> _root_directory;
 };
 
 }
@@ -138,4 +178,4 @@ public:
 }
 }
 
-#endif /* filesystem_hpp */
+#endif /* _io_github_paulyc_filesystem_hpp_ */
