@@ -74,9 +74,6 @@ class RecoveryLogReader : public RecoveryLogBase
 public:
     RecoveryLogReader(const std::string &filename) : RecoveryLogBase(filename) {}
     virtual ~RecoveryLogReader() {}
-
-    //void parse(const std::string &devfilename, const std::string &logfilename, const std::string &outdir);
-
 };
 
 class RecoveryLogTextReader : public RecoveryLogReader
@@ -119,8 +116,20 @@ class RecoveryLogBinaryWriter : public RecoveryLogWriter
 public:
     RecoveryLogBinaryWriter(const std::string &filename) : RecoveryLogWriter(filename), _logfile(filename, std::ios::binary | std::ios::trunc) {}
 
-    void writeToBinLog(const char *buf, size_t count) { _logfile.write(buf, count); }
+    void writeBadSectorToBinLog(size_t offset) {
+        _writeToBinLog((const char *)&offset, sizeof(size_t));
+        _writeToBinLog((const char *)&BadSectorFlag, sizeof(int32_t));
+    }
+
+    void writeEntityToBinLog(size_t offset, uint8_t *fde, std::shared_ptr<ExFATFilesystem::BaseEntity> entity) {
+        const int entries_size_bytes = entity->get_file_info_size();
+        _writeToBinLog((const char*)&offset, sizeof(size_t));
+        _writeToBinLog((const char*)&entries_size_bytes, sizeof(int32_t));
+        _writeToBinLog((const char*)fde, entries_size_bytes);
+    }
 private:
+    void _writeToBinLog(const char *buf, size_t count) { _logfile.write(buf, count); }
+
     std::ofstream _logfile;
 };
 
