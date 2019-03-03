@@ -25,8 +25,8 @@
 //  SOFTWARE.
 //
 
-#ifndef recoverylog_hpp
-#define recoverylog_hpp
+#ifndef _io_github_paulyc_recoverylog_hpp_
+#define _io_github_paulyc_recoverylog_hpp_
 
 #include <string>
 #include <fstream>
@@ -54,7 +54,8 @@ static constexpr uint32_t start_offset_cluster = 0x00adb000;
 static constexpr size_t start_offset_bytes = start_offset_cluster * cluster_size_bytes;
 static constexpr size_t start_offset_sector = start_offset_bytes / sector_size_bytes;
 
-class RecoveryLogBase {
+class RecoveryLogBase
+{
 public:
     RecoveryLogBase(const std::string &filename) : _filename(filename) {}
     virtual ~RecoveryLogBase() {}
@@ -62,34 +63,65 @@ public:
     static constexpr int32_t BadSectorFlag = -1;
 
 protected:
-    std::string _convert_utf16_to_utf8(uint8_t *fh, int namelen);
+    std::string _get_utf8_filename(uint8_t *fh, int namelen);
 
     std::string _filename;
     std::wstring_convert<std::codecvt_utf8_utf16<char16_t>, char16_t> _cvt;
 };
 
-class RecoveryLogReader : public RecoveryLogBase {
+class RecoveryLogReader : public RecoveryLogBase
+{
 public:
-    RecoveryLogReader(const std::string &filename) : RecoveryLogBase(filename), _logfile(filename) {}
+    RecoveryLogReader(const std::string &filename) : RecoveryLogBase(filename) {}
     virtual ~RecoveryLogReader() {}
 
-    void parse(const std::string &devfilename, const std::string &logfilename, const std::string &outdir);
-    void parseTextLog(io::github::paulyc::ExFATRestore::ExFATFilesystem &fs, std::function<void(size_t, std::variant<std::string, std::exception, bool>)>);
+    //void parse(const std::string &devfilename, const std::string &logfilename, const std::string &outdir);
+
+};
+
+class RecoveryLogTextReader : public RecoveryLogReader
+{
+public:
+    RecoveryLogTextReader(const std::string &filename) : RecoveryLogReader(filename), _logfile(filename) {}
+
+    void parseTextLog(ExFATFilesystem &fs, std::function<void(size_t, std::variant<std::string, std::exception, bool>)>);
 private:
     std::ifstream _logfile;
 };
 
-class RecoveryLogWriter : public RecoveryLogBase {
+class RecoveryLogBinaryReader : public RecoveryLogReader
+{
+public:
+    RecoveryLogBinaryReader(const std::string &filename) : RecoveryLogReader(filename), _logfile(filename, std::ios::binary) {}
+private:
+    std::ifstream _logfile;
+};
+
+class RecoveryLogWriter : public RecoveryLogBase
+{
 public:
     RecoveryLogWriter(const std::string &filename) : RecoveryLogBase(filename) {}
     virtual ~RecoveryLogWriter() {}
+};
 
-    void writeToBinLog(const char *buf, size_t count) { _binlog.write(buf, count); }
+class RecoveryLogTextWriter : public RecoveryLogWriter
+{
+public:
+    RecoveryLogTextWriter(const std::string &filename) : RecoveryLogWriter(filename), _logfile(filename, std::ios::trunc) {}
 
     void writeTextLog(const std::string &devfilename, const std::string &logfilename);
+private:
+    std::ofstream _logfile;
+};
 
-protected:
-    std::ofstream _binlog;
+class RecoveryLogBinaryWriter : public RecoveryLogWriter
+{
+public:
+    RecoveryLogBinaryWriter(const std::string &filename) : RecoveryLogWriter(filename), _logfile(filename, std::ios::binary | std::ios::trunc) {}
+
+    void writeToBinLog(const char *buf, size_t count) { _logfile.write(buf, count); }
+private:
+    std::ofstream _logfile;
 };
 
 }
@@ -97,4 +129,4 @@ protected:
 }
 }
 
-#endif /* recoverylog_hpp */
+#endif /* _io_github_paulyc_recoverylog_hpp_ */

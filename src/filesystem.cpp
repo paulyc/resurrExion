@@ -39,23 +39,23 @@
 
 using io::github::paulyc::ExFATRestore::ExFATFilesystem;
 
-io::github::paulyc::ExFATRestore::ExFATFilesystem::ExFATFilesystem(const char *devname, size_t devsize) :
+ExFATFilesystem::ExFATFilesystem(const char *devname, size_t devsize) :
     _fd(-1),
     _mmap((uint8_t*)MAP_FAILED),
     _devsize(devsize)
 {
     _fd = open(devname, O_RDONLY);
     if (_fd == -1) {
-        throw io::github::paulyc::ExFATRestore::posix_exception(errno);
+        throw io::github::paulyc::posix_exception(errno);
     }
 
     _mmap = (uint8_t*)mmap(0, _devsize, PROT_READ, MAP_PRIVATE, _fd, 0);
     if (_mmap == (uint8_t*)MAP_FAILED) {
-        throw io::github::paulyc::ExFATRestore::posix_exception(errno);
+        throw io::github::paulyc::posix_exception(errno);
     }
 }
 
-io::github::paulyc::ExFATRestore::ExFATFilesystem::~ExFATFilesystem()
+ExFATFilesystem::~ExFATFilesystem()
 {
     if (_mmap != MAP_FAILED) {
         munmap(_mmap, _devsize);
@@ -66,20 +66,21 @@ io::github::paulyc::ExFATRestore::ExFATFilesystem::~ExFATFilesystem()
     }
 }
 
-std::shared_ptr<ExFATFilesystem::BaseEntry> io::github::paulyc::ExFATRestore::ExFATFilesystem::loadEntry(size_t entry_offset)
+std::shared_ptr<ExFATFilesystem::BaseEntity> ExFATFilesystem::loadEntity(size_t entry_offset)
 {
     uint8_t *buf = _mmap + entry_offset;
     struct fs_file_directory_entry *fde = (struct fs_file_directory_entry*)(buf);
     struct fs_stream_extension_entry *streamext = (struct fs_stream_extension_entry*)(buf+32);
 
     if (fde->type != FILE_INFO1 || streamext->type != FILE_INFO2) {
-        return std::shared_ptr<ExFATFilesystem::BaseEntry>();
+        std::cerr << "bad file entry types at offset " << std::hex << entry_offset << std::endl;
+        return std::shared_ptr<ExFATFilesystem::BaseEntity>();
     }
 
     const int continuations = fde->continuations;
     if (continuations < 2 || continuations > 18) {
-        std::cerr << "bad number of continuations" << std::endl;
-        return std::shared_ptr<ExFATFilesystem::BaseEntry>();
+        std::cerr << "bad number of continuations at offset " << std::hex << entry_offset << std::endl;
+        return std::shared_ptr<ExFATFilesystem::BaseEntity>();
     }
 
     int i;
@@ -96,33 +97,42 @@ std::shared_ptr<ExFATFilesystem::BaseEntry> io::github::paulyc::ExFATRestore::Ex
     }
 
     if (chksum != fde->checksum) {
-        std::cerr << "bad checksum" << std::endl;
-        return std::shared_ptr<ExFATFilesystem::BaseEntry>();
+        std::cerr << "bad file entry checksum at offset " << std::hex << entry_offset << std::endl;
+        return std::shared_ptr<ExFATFilesystem::BaseEntity>();
     }
 
     if (fde->attrib & DIR) {
-        return std::make_shared<ExFATFilesystem::DirectoryEntry>(buf, continuations + 1);
+        std::shared_ptr<ExFATFilesystem::DirectoryEntity> de = std::make_shared<ExFATFilesystem::DirectoryEntity>(buf, continuations + 1);
+        _offset_to_entity_mapping[buf] = de;
+        return de;
     } else {
-        return std::make_shared<ExFATFilesystem::FileEntry>(buf, continuations + 1);
+        std::shared_ptr<ExFATFilesystem::FileEntity> fe = std::make_shared<ExFATFilesystem::FileEntity>(buf, continuations + 1);
+        _offset_to_entity_mapping[buf] = fe;
+        return fe;
     }
 }
 
-io::github::paulyc::ExFATRestore::ExFATFilesystem::BaseEntry::BaseEntry(void *entry_start, int num_entries)
+ExFATFilesystem::BaseEntity::BaseEntity(void *entry_start, int num_entries)
 {
     _fs_entries = (struct fs_entry *)entry_start;
     _num_entries = num_entries;
 }
 
-void io::github::paulyc::ExFATRestore::ExFATFilesystem::restore_all_files(const std::string &restore_dir_name, const std::string &textlogfilename)
+std::string ExFATFilesystem::BaseEntity::get_name() const
 {
-    io::github::paulyc::ExFATRestore::RecoveryLogReader reader(textlogfilename);
+    return std::string();
+}
+
+void ExFATFilesystem::restore_all_files(const std::string &restore_dir_name, const std::string &textlogfilename)
+{
+    RecoveryLogTextReader reader(textlogfilename);
 
     reader.parseTextLog(*this, [this, &restore_dir_name](size_t offset, std::variant<std::string, std::exception, bool> entry_info){
         if (std::holds_alternative<std::string>(entry_info)) {
             // File entry
             const std::string filename = std::get<std::string>(entry_info);
-            std::shared_ptr<ExFATFilesystem::FileEntry> ent = std::dynamic_pointer_cast<ExFATFilesystem::FileEntry>(loadEntry(offset));
-                //std::shared_ptr<ExFATFilesystem::FileEntry>(dynamic_cast<ExFATFilesystem::FileEntry>(loadEntry(offset)));
+            std::shared_ptr<ExFATFilesystem::FileEntity> ent = std::dynamic_pointer_cast<ExFATFilesystem::FileEntity>(loadEntity(offset));
+                //std::shared_ptr<ExFATFilesystem::FileEntity>(dynamic_cast<ExFATFilesystem::FileEntity>(loadEntity(offset)));
             if (!ent) {
                 std::cerr << "Invalid file entry at offset " << offset << std::endl;
                 return;
@@ -163,8 +173,8 @@ void io::github::paulyc::ExFATRestore::ExFATFilesystem::textLogToBinLog(
     const std::string &binlogfilename)
 {
     //std::ofstream binlog(binlogfilename, std::ios::binary | std::ios::trunc);
-    io::github::paulyc::ExFATRestore::RecoveryLogReader reader(textlogfilename);
-    io::github::paulyc::ExFATRestore::RecoveryLogWriter writer(binlogfilename);
+    io::github::paulyc::ExFATRestore::RecoveryLogTextReader reader(textlogfilename);
+    io::github::paulyc::ExFATRestore::RecoveryLogBinaryWriter writer(binlogfilename);
 
 #if 0
     BP_ASSERT(false, "Don't call this");
@@ -172,14 +182,14 @@ void io::github::paulyc::ExFATRestore::ExFATFilesystem::textLogToBinLog(
     reader.parseTextLog(*this, [this, &writer](size_t offset, std::variant<std::string, std::exception, bool> entry_info) {
         if (std::holds_alternative<std::string>(entry_info)) {
             // File entry
-            std::shared_ptr<ExFATFilesystem::BaseEntry> entry = loadEntry(offset);
+            std::shared_ptr<ExFATFilesystem::BaseEntity> entry = loadEntity(offset);
             if (entry) {
                 const int entries_size_bytes = entry->get_file_info_size();
                 writer.writeToBinLog((const char *)&offset, sizeof(size_t));
                 writer.writeToBinLog((const char *)&entries_size_bytes, sizeof(int32_t));
                 writer.writeToBinLog((const char*)(_mmap + offset), entries_size_bytes);
             } else {
-                std::cerr << "failed to loadEntry at " << std::hex << offset << std::endl;
+                std::cerr << "failed to loadEntity at " << std::hex << offset << std::endl;
             }
         } else if (std::holds_alternative<bool>(entry_info)) {
             // Bad sector
@@ -205,7 +215,7 @@ void io::github::paulyc::ExFATRestore::ExFATFilesystem::textLogToBinLog(
             filename = sm[2];
             try {
                 offset = std::stol(sm[1], nullptr, 16);
-                _writeBinlogFileEntry(dev, offset, binlog);
+                _writeBinlogFileEntity(dev, offset, binlog);
             } catch (std::exception &ex) {
                 std::cerr << "Writing file entry to binlog, got exception: " << typeid(ex).name() << " with msg: " << ex.what() << std::endl;
                 std::cerr << "Invalid textlog FDE line, skipping: " << line << std::endl;

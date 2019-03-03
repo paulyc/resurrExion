@@ -38,8 +38,10 @@
 #include <sys/mman.h>
 #include <unistd.h>
 
-void io::github::paulyc::ExFATRestore::RecoveryLogReader::parseTextLog(
-    io::github::paulyc::ExFATRestore::ExFATFilesystem &fs,
+using namespace io::github::paulyc::ExFATRestore;
+
+void RecoveryLogTextReader::parseTextLog(
+    ExFATFilesystem &fs,
     std::function<void(size_t, std::variant<std::string, std::exception, bool>)> cb)
 {
     std::regex fde("FDE ([0-9a-fA-F]{16})(?: (.*))?");
@@ -53,7 +55,7 @@ void io::github::paulyc::ExFATRestore::RecoveryLogReader::parseTextLog(
             filename = sm[2];
             try {
                 offset = std::stol(sm[1], nullptr, 16);
-                std::shared_ptr<ExFATFilesystem::BaseEntry> ent = fs.loadEntry(offset);
+                std::shared_ptr<ExFATFilesystem::BaseEntity> ent = fs.loadEntity(offset);
                 cb(offset, std::variant<std::string, std::exception, bool>(filename));
             } catch (std::exception &ex) {
                 std::cerr << "Writing file entry to binlog, got exception: " << typeid(ex).name() << " with msg: " << ex.what() << std::endl;
@@ -81,7 +83,7 @@ void io::github::paulyc::ExFATRestore::RecoveryLogReader::parseTextLog(
 constexpr int exfat_filename_maxlen = 256;
 constexpr int exfat_filename_maxlen_utf8 = exfat_filename_maxlen * 2;
 
-std::string io::github::paulyc::ExFATRestore::RecoveryLogBase::_convert_utf16_to_utf8(uint8_t *fh, int namelen)
+std::string RecoveryLogBase::_get_utf8_filename(uint8_t *fh, int namelen)
 {
     struct fs_file_directory_entry *fde = (struct fs_file_directory_entry *)fh;
     const int continuations = fde->continuations;
@@ -102,7 +104,7 @@ std::string io::github::paulyc::ExFATRestore::RecoveryLogBase::_convert_utf16_to
     return _cvt.to_bytes(u16s);
 }
 
-void io::github::paulyc::ExFATRestore::RecoveryLogWriter::writeTextLog(
+void RecoveryLogTextWriter::writeTextLog(
     const std::string &devfilename,
     const std::string &logfilename)
 {
@@ -118,7 +120,7 @@ void io::github::paulyc::ExFATRestore::RecoveryLogWriter::writeTextLog(
     dev.read((char*)buffer, sizeof(buffer));
 
     while (!eof || bufp + 96 < bufend) {
-        //if (io::github::paulyc::ExFATRestore::ExFATFilesystem::verifyFileEntry(bufp, bufend - bufp)) {
+        //if (io::github::paulyc::ExFATRestore::ExFATFilesystem::verifyFileEntity(bufp, bufend - bufp)) {
         //}
 
         if (bufp[0] == FILE_INFO1) {
@@ -143,7 +145,7 @@ void io::github::paulyc::ExFATRestore::RecoveryLogWriter::writeTextLog(
                     if (chksum == m1->checksum) {
                         std::string fname;
                         try {
-                            fname = convert_utf16_to_utf8(bufp, m2->name_length);
+                            fname = _get_utf8_filename(bufp, m2->name_length);
                         } catch (std::exception &e) {
                             std::cerr << e.what() << std::endl;
                             fname = "ERR";
@@ -203,4 +205,4 @@ void io::github::paulyc::ExFATRestore::RecoveryLogWriter::writeTextLog(
 #endif
 }
 
-constexpr int32_t io::github::paulyc::ExFATRestore::RecoveryLogBase::BadSectorFlag;
+constexpr int32_t RecoveryLogBase::BadSectorFlag;

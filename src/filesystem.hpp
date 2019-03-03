@@ -25,14 +25,15 @@
 //  SOFTWARE.
 //
 
-#ifndef filesystem_hpp
-#define filesystem_hpp
+#ifndef _io_github_paulyc_filesystem_hpp_
+#define _io_github_paulyc_filesystem_hpp_
 
 #include <stdint.h>
 #include <stddef.h>
 
 #include <fstream>
 #include <memory>
+#include <unordered_map>
 
 enum fs_entry_flags_t {
     VALID 		= 0x80,
@@ -125,35 +126,38 @@ public:
     ExFATFilesystem(const char *devname, size_t devsize);
     virtual ~ExFATFilesystem();
 
-    class BaseEntry
+    class BaseEntity
     {
     public:
-        BaseEntry(void *entry_start, int num_entries);
-        virtual ~BaseEntry() {}
+        BaseEntity(void *entry_start, int num_entries);
+        virtual ~BaseEntity() {}
 
         int get_file_info_size() const { return _num_entries * sizeof(struct fs_entry); }
         uint32_t get_start_cluster() const { return ((struct fs_stream_extension_entry *)(_fs_entries + 1))->start_cluster; }
         uint64_t get_size() const { return ((struct fs_stream_extension_entry *)(_fs_entries + 1))->size; }
+        std::string get_name() const;
     protected:
         struct fs_entry *_fs_entries;
         int _num_entries;
+        std::shared_ptr<BaseEntity> _parent;
     };
 
-    class FileEntry : public BaseEntry
+    class FileEntity : public BaseEntity
     {
     public:
-        FileEntry(void *entry_start, int num_entries) : BaseEntry(entry_start, num_entries) {}
+        FileEntity(void *entry_start, int num_entries) : BaseEntity(entry_start, num_entries) {}
 
         bool is_contiguous() const { return ((struct fs_stream_extension_entry *)(_fs_entries + 1))->flags & CONTIGUOUS; }
     };
 
-    class DirectoryEntry : public BaseEntry
+    class DirectoryEntity : public BaseEntity
     {
     public:
-        DirectoryEntry(void *entry_start, int num_entries) : BaseEntry(entry_start, num_entries) {}
+        DirectoryEntity(void *entry_start, int num_entries) : BaseEntity(entry_start, num_entries) {}
+    private:
     };
 
-    std::shared_ptr<BaseEntry> loadEntry(size_t entry_offset);
+    std::shared_ptr<BaseEntity> loadEntity(size_t entry_offset);
 
     void restore_all_files(const std::string &restore_dir_name, const std::string &textlogfilename);
 
@@ -163,6 +167,10 @@ private:
     int _fd;
     uint8_t *_mmap;
     size_t _devsize;
+
+    std::unordered_map<uint8_t*, std::shared_ptr<BaseEntity>> _offset_to_entity_mapping;
+    //std::list<uint64_t> _bad_sector_list;
+    std::shared_ptr<DirectoryEntity> _root_directory;
 };
 
 }
@@ -170,4 +178,4 @@ private:
 }
 }
 
-#endif /* filesystem_hpp */
+#endif /* _io_github_paulyc_filesystem_hpp_ */
