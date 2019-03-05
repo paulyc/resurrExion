@@ -1,8 +1,8 @@
 //
-//  exception.hpp
+//  logger.hpp - Console/file/syslog logging interface
 //  ExFATRestore
 //
-//  Created by Paul Ciarlo on 2/12/19.
+//  Created by Paul Ciarlo on 5 March 2019.
 //
 //  Copyright (C) 2019 Paul Ciarlo <paul.ciarlo@gmail.com>.
 //
@@ -25,64 +25,54 @@
 //  SOFTWARE.
 //
 
-#ifndef _io_github_paulyc_exception_hpp_
-#define _io_github_paulyc_exception_hpp_
+#ifndef _io_github_paulyc_logger_hpp_
+#define _io_github_paulyc_logger_hpp_
 
-#include <string>
-#include <exception>
-#include <iostream>
-#include <string.h>
-
-inline void bpAssert(bool test, std::string msg)
-{
-    if (!test) {
-        std::cerr << "Breakpoint assertion failed: " << msg << std::endl;
-        asm("int $3");
-    }
-}
-
-#ifdef _DEBUG
-#define BP_ASSERT(test, msg) bpAssert((test), (msg))
-#else
-#define BP_ASSERT(test, msg)
+#if USE_LOG4CPLUS
+#include <log4cplus/logger.h>
+#include <log4cplus/loggingmacros.h>
+#include <log4cplus/configurator.h>
+#include <log4cplus/initializer.h>
 #endif
+
+#include <memory>
+#include <sstream>
 
 namespace io {
 namespace github {
 namespace paulyc {
 
-class posix_exception : public std::exception {
-public:
-    posix_exception(int errno_) : _errno(errno_) {}
-    virtual ~posix_exception() {}
+class LoggerInterface;
 
-    virtual const char *what() const noexcept { return strerror(_errno); }
+class Loggable
+{
+protected:
+    enum LogLevel {
+        TRACE    = 1,
+        DEBUG    = 2,
+        INFO     = 3,
+        WARN     = 4,
+        ERROR    = 5,
+        CRITICAL = 6
+    };
+
+    Loggable();
+    virtual ~Loggable() {}
+
+    void logf(LogLevel l, const char *fmt, ...);
+    void formatLogPrefix(std::ostringstream &prefix, LogLevel l);
+
+    void setLogLevel(LogLevel l) { _level = l; }
+
 private:
-    int _errno;
+    std::shared_ptr<LoggerInterface> _logger;
+    LogLevel _level;
+    std::string _type_str;
 };
 
-class string_exception : public std::exception {
-public:
-    string_exception(const std::string &msg) : _msg(msg) {}
-    virtual ~string_exception() {}
-
-    virtual const char* what() const noexcept { return _msg.c_str(); }
-private:
-    std::string _msg;
-};
-
-namespace ExFATRestore {
-
-class restore_error : public string_exception {
-public:
-    restore_error(const std::string &msg) : string_exception(msg) {}
-    virtual ~restore_error() {}
-};
-
-}
 
 }
 }
 }
 
-#endif /* _io_github_paulyc_exception_hpp_ */
+#endif /* _io_github_paulyc_logger_hpp_ */
