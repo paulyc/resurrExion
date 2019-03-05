@@ -11,7 +11,5 @@ add_executable(
 	ExFATRestore
 
 	src/exception.cpp
-	src/filesystem.cpp
 	src/main.cpp
-	src/recoverylog.cpp
 )

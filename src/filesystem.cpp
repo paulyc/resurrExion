@@ -25,37 +25,32 @@
 //  SOFTWARE.
 //
 
-#include <sys/mman.h>
-#include <sys/stat.h>
-#include <fcntl.h>
-#include <unistd.h>
-
-#include <variant>
-#include <memory>
-
-#include "filesystem.hpp"
-#include "exception.hpp"
 #include "recoverylog.hpp"
 
-using io::github::paulyc::ExFATRestore::ExFATFilesystem;
+namespace io {
+namespace github {
+namespace paulyc {
+namespace ExFATRestore {
 
-ExFATFilesystem::ExFATFilesystem(const char *devname, size_t devsize) :
+template <size_t SectorSize, size_t SectorsPerCluster, size_t NumSectors>
+ExFATFilesystem<SectorSize, SectorsPerCluster, NumSectors>::ExFATFilesystem(const char *devname, size_t devsize, size_t partition_first_sector) :
     _fd(-1),
     _mmap((uint8_t*)MAP_FAILED),
-    _devsize(devsize)
+    _devsize()
 {
     _fd = open(devname, O_RDONLY);
     if (_fd == -1) {
-        throw io::github::paulyc::posix_exception(errno);
+        throw posix_exception(errno);
     }
 
     _mmap = (uint8_t*)mmap(0, _devsize, PROT_READ, MAP_PRIVATE, _fd, 0);
     if (_mmap == (uint8_t*)MAP_FAILED) {
-        throw io::github::paulyc::posix_exception(errno);
+        throw posix_exception(errno);
     }
 }
 
-ExFATFilesystem::~ExFATFilesystem()
+template <size_t SectorSize, size_t SectorsPerCluster, size_t NumSectors>
+ExFATFilesystem<SectorSize, SectorsPerCluster, NumSectors>::~ExFATFilesystem()
 {
     if (_mmap != MAP_FAILED) {
         munmap(_mmap, _devsize);
@@ -66,15 +61,18 @@ ExFATFilesystem::~ExFATFilesystem()
     }
 }
 
-std::shared_ptr<ExFATFilesystem::BaseEntity> ExFATFilesystem::loadEntity(size_t entry_offset)
+template <size_t SectorSize, size_t SectorsPerCluster, size_t NumSectors>
+std::shared_ptr<typename ExFATFilesystem<SectorSize, SectorsPerCluster, NumSectors>::BaseEntity>
+ExFATFilesystem<SectorSize, SectorsPerCluster, NumSectors>::loadEntity(size_t entry_offset)
 {
     uint8_t *buf = _mmap + entry_offset;
     struct fs_file_directory_entry *fde = (struct fs_file_directory_entry*)(buf);
     struct fs_stream_extension_entry *streamext = (struct fs_stream_extension_entry*)(buf+32);
+    struct fs_file_name_entry *n = (struct fs_file_name_entry*)(buf+64);
 
-    if (fde->type != FILE_ENTRY || streamext->type != STREAM_EXTENSION) {
+    if (fde->type != FILE_ENTRY || streamext->type != STREAM_EXTENSION || n->type != FILE_NAME) {
         std::cerr << "bad file entry types at offset " << std::hex << entry_offset << std::endl;
-        return std::shared_ptr<ExFATFilesystem::BaseEntity>();
+        return nullptr;
     }
 
     const int continuations = fde->continuations;
@@ -101,38 +99,67 @@ std::shared_ptr<ExFATFilesystem::BaseEntity> ExFATFilesystem::loadEntity(size_t 
         return std::shared_ptr<ExFATFilesystem::BaseEntity>();
     }
 
+    std::basic_string<char16_t> u16s;
+    std::string utf8_name;
+    int namelen = streamext->name_length;
+    for (int c = 0; c <= continuations - 2; ++c) {
+        if (n[c].type == FILE_NAME) {
+            for (int i = 0; i < sizeof(n[c].name); ++i) {
+                if (u16s.length() == namelen) {
+                    break;
+                } else {
+                    u16s.push_back(n[c].name[i]);
+                }
+            }
+        }
+    }
+    if (u16s.length() != namelen) {
+        std::cerr << "Warning: u16s.length() != namelen for entity at offset " << std::hex << entry_offset << std::endl;
+    }
+    utf8_name = _cvt.to_bytes(u16s);
+
+    // TODO load parents and children here.....
     if (fde->attributes & DIRECTORY) {
-        std::shared_ptr<ExFATFilesystem::DirectoryEntity> de = std::make_shared<ExFATFilesystem::DirectoryEntity>(buf, continuations + 1);
+        std::shared_ptr<DirectoryEntity> de = std::make_shared<DirectoryEntity>(buf, continuations + 1, nullptr, utf8_name);
         _offset_to_entity_mapping[buf] = de;
         return de;
     } else {
-        std::shared_ptr<ExFATFilesystem::FileEntity> fe = std::make_shared<ExFATFilesystem::FileEntity>(buf, continuations + 1);
+        std::shared_ptr<FileEntity> fe = std::make_shared<FileEntity>(buf, continuations + 1, nullptr, utf8_name);
         _offset_to_entity_mapping[buf] = fe;
         return fe;
     }
 }
 
-ExFATFilesystem::BaseEntity::BaseEntity(void *entry_start, int num_entries)
+template <size_t SectorSize, size_t SectorsPerCluster, size_t NumSectors>
+ExFATFilesystem<SectorSize, SectorsPerCluster, NumSectors>::BaseEntity::BaseEntity(void *entry_start, int num_entries, std::shared_ptr<BaseEntity> parent, const std::string &name) :
+    _fs_entries((struct fs_entry *)entry_start),
+    _num_entries(num_entries),
+    _parent(parent),
+    _name(name)
 {
-    _fs_entries = (struct fs_entry *)entry_start;
-    _num_entries = num_entries;
 }
 
-std::string ExFATFilesystem::BaseEntity::get_name() const
+template <size_t SectorSize, size_t SectorsPerCluster, size_t NumSectors>
+ExFATFilesystem<SectorSize, SectorsPerCluster, NumSectors>::DirectoryEntity::DirectoryEntity(
+    void *entry_start,
+    int num_entries,
+    std::shared_ptr<BaseEntity> parent,
+    const std::string &name) :
+    BaseEntity(entry_start, num_entries, parent, name)
 {
-    return std::string();
+
 }
 
-void ExFATFilesystem::restore_all_files(const std::string &restore_dir_name, const std::string &textlogfilename)
+template <size_t SectorSize, size_t SectorsPerCluster, size_t NumSectors>
+void ExFATFilesystem<SectorSize, SectorsPerCluster, NumSectors>::restore_all_files(const std::string &restore_dir_name, const std::string &textlogfilename)
 {
-    RecoveryLogTextReader reader(textlogfilename);
+    RecoveryLogTextReader<ExFATFilesystem<SectorSize, SectorsPerCluster, NumSectors>> reader(textlogfilename);
 
     reader.parseTextLog(*this, [this, &restore_dir_name](size_t offset, std::variant<std::string, std::exception, bool> entry_info){
         if (std::holds_alternative<std::string>(entry_info)) {
             // File entry
             const std::string filename = std::get<std::string>(entry_info);
-            std::shared_ptr<ExFATFilesystem::FileEntity> ent = std::dynamic_pointer_cast<ExFATFilesystem::FileEntity>(loadEntity(offset));
-                //std::shared_ptr<ExFATFilesystem::FileEntity>(dynamic_cast<ExFATFilesystem::FileEntity>(loadEntity(offset)));
+            std::shared_ptr<FileEntity> ent = std::dynamic_pointer_cast<FileEntity>(loadEntity(offset));
             if (!ent) {
                 std::cerr << "Invalid file entry at offset " << offset << std::endl;
                 return;
@@ -168,17 +195,18 @@ void ExFATFilesystem::restore_all_files(const std::string &restore_dir_name, con
  * 32-bit int, number of bytes in record, OR -1 if bad sector
  * variable bytes equal to number of bytes in record
  */
-void ExFATFilesystem::textLogToBinLog(
+template <size_t SectorSize, size_t SectorsPerCluster, size_t NumSectors>
+void ExFATFilesystem<SectorSize, SectorsPerCluster, NumSectors>::textLogToBinLog(
     const std::string &textlogfilename,
     const std::string &binlogfilename)
 {
-    io::github::paulyc::ExFATRestore::RecoveryLogTextReader reader(textlogfilename);
-    io::github::paulyc::ExFATRestore::RecoveryLogBinaryWriter writer(binlogfilename);
+    RecoveryLogTextReader reader(textlogfilename);
+    RecoveryLogBinaryWriter writer(binlogfilename);
 
     reader.parseTextLog(*this, [this, &writer](size_t offset, std::variant<std::string, std::exception, bool> entry_info) {
         if (std::holds_alternative<std::string>(entry_info)) {
             // File entry
-            std::shared_ptr<ExFATFilesystem::BaseEntity> entity = loadEntity(offset);
+            std::shared_ptr<BaseEntity> entity = loadEntity(offset);
             if (entity) {
                 writer.writeEntityToBinLog(offset, _mmap + offset, entity);
             } else {
@@ -193,4 +221,9 @@ void ExFATFilesystem::textLogToBinLog(
             std::cerr << "entry_info had " << typeid(ex).name() << " with message: " << ex.what() << std::endl;
         }
     });
+}
+
+}
+}
+}
 }

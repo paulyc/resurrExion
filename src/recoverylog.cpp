@@ -25,6 +25,8 @@
 //  SOFTWARE.
 //
 
+#if 0
+
 #include "filesystem.hpp"
 #include "recoverylog.hpp"
 #include "exception.hpp"
@@ -40,71 +42,12 @@
 
 using namespace io::github::paulyc::ExFATRestore;
 
-void RecoveryLogTextReader::parseTextLog(
-    ExFATFilesystem &fs,
-    std::function<void(size_t, std::variant<std::string, std::exception, bool>)> cb)
-{
-    std::regex fde("FDE ([0-9a-fA-F]{16})(?: (.*))?");
-    std::regex badsector("BAD_SECTOR ([0-9a-fA-F]{16})");
+template <typename Filesystem_T>
+std::string RecoveryLogBase<Filesystem_T>::_get_utf8_filename(uint8_t *fh, int namelen)
 
-    for (std::string line; std::getline(_logfile, line); ) {
-        std::smatch sm;
-        if (std::regex_match(line, sm, fde)) {
-            size_t offset;
-            std::string filename;
-            filename = sm[2];
-            try {
-                offset = std::stol(sm[1], nullptr, 16);
-                std::shared_ptr<ExFATFilesystem::BaseEntity> ent = fs.loadEntity(offset);
-                cb(offset, std::variant<std::string, std::exception, bool>(filename));
-            } catch (std::exception &ex) {
-                std::cerr << "Writing file entry to binlog, got exception: " << typeid(ex).name() << " with msg: " << ex.what() << std::endl;
-                std::cerr << "Invalid textlog FDE line, skipping: " << line << std::endl;
-                cb(0, std::variant<std::string, std::exception, bool>(ex));
-            }
-        } else if (std::regex_match(line, sm, badsector)) {
-            int32_t bad_sector_flag;
-            size_t offset;
-            try {
-                offset = std::stol(sm[1], nullptr, 16);
-                cb(offset, std::variant<std::string, std::exception, bool>(true));
-            } catch (std::exception &ex) {
-                std::cerr << "Writing bad sector to binlog, got exception " << typeid(ex).name() << " with msg: " << ex.what() << std::endl;
-                std::cerr << "Invalid textlog BAD_SECTOR line, skipping: " << line << std::endl;
-                cb(0, std::variant<std::string, std::exception, bool>(ex));
-            }
-        } else {
-            std::cerr << "Unknown textlog line format: " << line << std::endl;
-            cb(0, std::variant<std::string, std::exception, bool>(std::exception()));
-        }
-    }
-}
 
-constexpr int exfat_filename_maxlen = 256;
-constexpr int exfat_filename_maxlen_utf8 = exfat_filename_maxlen * 2;
-
-std::string RecoveryLogBase::_get_utf8_filename(uint8_t *fh, int namelen)
-{
-    struct fs_file_directory_entry *fde = (struct fs_file_directory_entry *)fh;
-    const int continuations = fde->continuations;
-    std::basic_string<char16_t> u16s;
-    for (int c = 1; c <= continuations; ++c) {
-        fh += 32;
-        if (fh[0] == FILE_NAME) {
-            struct fs_file_name_entry *n = (struct fs_file_name_entry*)fh;
-            for (int i = 0; i < sizeof(n->name); ++i) {
-                if (u16s.length() == namelen) {
-                    return _cvt.to_bytes(u16s);
-                } else {
-                    u16s.push_back(n->name[i]);
-                }
-            }
-        }
-    }
-    return _cvt.to_bytes(u16s);
-}
-
-void RecoveryLogTextWriter::writeTextLog(
+template <typename Filesystem_T>
+void RecoveryLogTextWriter<Filesystem_T>::writeTextLog(
     const std::string &devfilename,
     const std::string &logfilename)
 {
@@ -205,4 +148,4 @@ void RecoveryLogTextWriter::writeTextLog(
 #endif
 }
 
-constexpr int32_t RecoveryLogBase::BadSectorFlag;
+#endif

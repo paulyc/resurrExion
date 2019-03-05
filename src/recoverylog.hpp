@@ -34,8 +34,7 @@
 #include <variant>
 #include <locale>
 #include <codecvt>
-
-#include "filesystem.hpp"
+#include <regex>
 
 namespace io {
 namespace github {
@@ -45,7 +44,7 @@ namespace ExFATRestore {
 static constexpr size_t sector_size_bytes = 512; // bytes 0x0200
 static constexpr size_t sectors_per_cluster = 512; // 0x0200
 static constexpr size_t cluster_size_bytes = sector_size_bytes * sectors_per_cluster; // 0x040000
-static constexpr size_t disk_size_bytes = 0x000003a352944000; // 0x0000040000000000; // 4TB
+static constexpr size_t disk_size_bytes = 0x000003a352944000; // 40000000000; // 4TB
 static constexpr size_t cluster_heap_disk_start_sector = 0x8c400;
 static constexpr size_t cluster_heap_partition_start_sector = 0x283D8;
 static constexpr size_t partition_start_sector = 0x64028;
@@ -54,74 +53,139 @@ static constexpr uint32_t start_offset_cluster = 0x00adb000;
 static constexpr size_t start_offset_bytes = start_offset_cluster * cluster_size_bytes;
 static constexpr size_t start_offset_sector = start_offset_bytes / sector_size_bytes;
 
+constexpr int exfat_filename_maxlen = 256;
+constexpr int exfat_filename_maxlen_utf8 = exfat_filename_maxlen * 2;
+
+static constexpr int32_t BadSectorFlag = -1;
+
+template <typename Filesystem_T>
 class RecoveryLogBase
 {
 public:
     RecoveryLogBase(const std::string &filename) : _filename(filename) {}
     virtual ~RecoveryLogBase() {}
 
-    static constexpr int32_t BadSectorFlag = -1;
-
 protected:
-    std::string _get_utf8_filename(uint8_t *fh, int namelen);
+    std::string _get_utf8_filename(uint8_t *fh, int namelen)
+    {
+        struct fs_file_directory_entry *fde = (struct fs_file_directory_entry *)fh;
+        const int continuations = fde->continuations;
+        std::basic_string<char16_t> u16s;
+        for (int c = 1; c <= continuations; ++c) {
+            fh += 32;
+            if (fh[0] == FILE_NAME) {
+                struct fs_file_name_entry *n = (struct fs_file_name_entry*)fh;
+                for (int i = 0; i < sizeof(n->name); ++i) {
+                    if (u16s.length() == namelen) {
+                        return _cvt.to_bytes(u16s);
+                    } else {
+                        u16s.push_back(n->name[i]);
+                    }
+                }
+            }
+        }
+        return _cvt.to_bytes(u16s);
+    }
 
     std::string _filename;
     std::wstring_convert<std::codecvt_utf8_utf16<char16_t>, char16_t> _cvt;
 };
 
-class RecoveryLogReader : public RecoveryLogBase
+template <typename Filesystem_T>
+class RecoveryLogReader : public RecoveryLogBase<Filesystem_T>
 {
 public:
-    RecoveryLogReader(const std::string &filename) : RecoveryLogBase(filename) {}
+    RecoveryLogReader(const std::string &filename) : RecoveryLogBase<Filesystem_T>(filename) {}
     virtual ~RecoveryLogReader() {}
 };
 
-class RecoveryLogTextReader : public RecoveryLogReader
+template <typename Filesystem_T>
+class RecoveryLogTextReader : public RecoveryLogReader<Filesystem_T>
 {
 public:
-    RecoveryLogTextReader(const std::string &filename) : RecoveryLogReader(filename), _logfile(filename) {}
+    RecoveryLogTextReader(const std::string &filename) : RecoveryLogReader<Filesystem_T>(filename), _logfile(filename) {}
 
-    void parseTextLog(ExFATFilesystem &fs, std::function<void(size_t, std::variant<std::string, std::exception, bool>)>);
+    void parseTextLog(Filesystem_T &fs, std::function<void(size_t, std::variant<std::string, std::exception, bool>)> cb)
+    {
+        std::regex fde("FDE ([0-9a-fA-F]{16})(?: (.*))?");
+        std::regex badsector("BAD_SECTOR ([0-9a-fA-F]{16})");
+
+        for (std::string line; std::getline(_logfile, line); ) {
+            std::smatch sm;
+            if (std::regex_match(line, sm, fde)) {
+                size_t offset;
+                std::string filename;
+                filename = sm[2];
+                try {
+                    offset = std::stol(sm[1], nullptr, 16);
+                    std::shared_ptr<typename Filesystem_T::BaseEntity> ent = fs.loadEntity(offset);
+                    cb(offset, std::variant<std::string, std::exception, bool>(filename));
+                } catch (std::exception &ex) {
+                    std::cerr << "Writing file entry to binlog, got exception: " << typeid(ex).name() << " with msg: " << ex.what() << std::endl;
+                    std::cerr << "Invalid textlog FDE line, skipping: " << line << std::endl;
+                    cb(0, std::variant<std::string, std::exception, bool>(ex));
+                }
+            } else if (std::regex_match(line, sm, badsector)) {
+                int32_t bad_sector_flag;
+                size_t offset;
+                try {
+                    offset = std::stol(sm[1], nullptr, 16);
+                    cb(offset, std::variant<std::string, std::exception, bool>(true));
+                } catch (std::exception &ex) {
+                    std::cerr << "Writing bad sector to binlog, got exception " << typeid(ex).name() << " with msg: " << ex.what() << std::endl;
+                    std::cerr << "Invalid textlog BAD_SECTOR line, skipping: " << line << std::endl;
+                    cb(0, std::variant<std::string, std::exception, bool>(ex));
+                }
+            } else {
+                std::cerr << "Unknown textlog line format: " << line << std::endl;
+                cb(0, std::variant<std::string, std::exception, bool>(std::exception()));
+            }
+        }
+    }
 private:
     std::ifstream _logfile;
 };
 
-class RecoveryLogBinaryReader : public RecoveryLogReader
+template <typename Filesystem_T>
+class RecoveryLogBinaryReader : public RecoveryLogReader<Filesystem_T>
 {
 public:
-    RecoveryLogBinaryReader(const std::string &filename) : RecoveryLogReader(filename), _logfile(filename, std::ios::binary) {}
+    RecoveryLogBinaryReader(const std::string &filename) : RecoveryLogReader<Filesystem_T>(filename), _logfile(filename, std::ios::binary) {}
 private:
     std::ifstream _logfile;
 };
 
-class RecoveryLogWriter : public RecoveryLogBase
+template <typename Filesystem_T>
+class RecoveryLogWriter : public RecoveryLogBase<Filesystem_T>
 {
 public:
-    RecoveryLogWriter(const std::string &filename) : RecoveryLogBase(filename) {}
+    RecoveryLogWriter(const std::string &filename) : RecoveryLogBase<Filesystem_T>(filename) {}
     virtual ~RecoveryLogWriter() {}
 };
 
-class RecoveryLogTextWriter : public RecoveryLogWriter
+template <typename Filesystem_T>
+class RecoveryLogTextWriter : public RecoveryLogWriter<Filesystem_T>
 {
 public:
-    RecoveryLogTextWriter(const std::string &filename) : RecoveryLogWriter(filename), _logfile(filename, std::ios::trunc) {}
+    RecoveryLogTextWriter(const std::string &filename) : RecoveryLogWriter<Filesystem_T>(filename), _logfile(filename, std::ios::trunc) {}
 
     void writeTextLog(const std::string &devfilename, const std::string &logfilename);
 private:
     std::ofstream _logfile;
 };
 
-class RecoveryLogBinaryWriter : public RecoveryLogWriter
+template <typename Filesystem_T>
+class RecoveryLogBinaryWriter : public RecoveryLogWriter<Filesystem_T>
 {
 public:
-    RecoveryLogBinaryWriter(const std::string &filename) : RecoveryLogWriter(filename), _logfile(filename, std::ios::binary | std::ios::trunc) {}
+    RecoveryLogBinaryWriter(const std::string &filename) : RecoveryLogWriter<Filesystem_T>(filename), _logfile(filename, std::ios::binary | std::ios::trunc) {}
 
     void writeBadSectorToBinLog(size_t offset) {
         _writeToBinLog((const char *)&offset, sizeof(size_t));
         _writeToBinLog((const char *)&BadSectorFlag, sizeof(int32_t));
     }
 
-    void writeEntityToBinLog(size_t offset, uint8_t *fde, std::shared_ptr<ExFATFilesystem::BaseEntity> entity) {
+    void writeEntityToBinLog(size_t offset, uint8_t *fde, std::shared_ptr<typename Filesystem_T::BaseEntity> entity) {
         const int entries_size_bytes = entity->get_file_info_size();
         _writeToBinLog((const char*)&offset, sizeof(size_t));
         _writeToBinLog((const char*)&entries_size_bytes, sizeof(int32_t));
@@ -137,5 +201,7 @@ private:
 }
 }
 }
+
+#include "recoverylog.cpp"
 
 #endif /* _io_github_paulyc_recoverylog_hpp_ */

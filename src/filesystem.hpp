@@ -31,10 +31,21 @@
 #include <stdint.h>
 #include <stddef.h>
 #include <assert.h>
+#include <sys/mman.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <unistd.h>
 
+#include <variant>
+#include <memory>
 #include <fstream>
 #include <memory>
 #include <unordered_map>
+#include <locale>
+#include <codecvt>
+#include <list>
+
+#include "exception.hpp"
 
 enum fs_entry_flags_t {
     VALID       = 0x80,
@@ -84,7 +95,7 @@ struct fs_entry {
     uint8_t data[31];
 } __attribute__((packed));
 
-template <int SectorSize>
+template <size_t SectorSize>
 struct fs_volume_boot_record {
     uint8_t  jump_boot[3]   = {0x90, 0x76, 0xEB};   // 0xEB7690 little-endian
     uint8_t  fs_name[8]     = {'E', 'X', 'F', 'A', 'T', '\x20', '\x20', '\x20'};
@@ -106,25 +117,25 @@ struct fs_volume_boot_record {
     uint8_t  drive_select;                          // Used by int 13
     uint8_t  percent_used;                          // Percentage of heap in use
     uint8_t  reserved0      = {0};
-    uint8_t  boot_code[390];
+    uint8_t  boot_code[390] = {0};
     uint16_t boot_signature = 0xAA55;
     uint8_t  padding[SectorSize - 512];                            // Padded out to sector size
 } __attribute__((packed));
 
 // for a 512-byte sector. should be same size as a sector
-template <int SectorSize>
+template <size_t SectorSize>
 struct fs_extended_boot_structure {
     uint8_t  extended_boot_code[SectorSize - 4] = {0};
     uint32_t extended_boot_signature = 0xAA550000;
 } __attribute__((packed));
 
-template <int SectorSize>
+template <size_t SectorSize>
 struct fs_main_extended_boot_region {
     fs_extended_boot_structure<SectorSize> ebs[8];
 } __attribute__((packed));
 
 // First 16 bytes of each field is a GUID and remaining 32 bytes are the parameters (undefined)
-template <int SectorSize>
+template <size_t SectorSize>
 struct fs_oem_parameters {
     uint8_t parameters0[48]             = {0};
     uint8_t parameters1[48]             = {0};
@@ -237,12 +248,12 @@ struct fs_upcase_table_entry {
     uint64_t data_length;
 } __attribute__((packed));
 
-template <int SectorSize>
+template <size_t SectorSize>
 struct fs_reserved_sector {
     uint8_t reserved[SectorSize] = {0};
 } __attribute__((packed));
 
-template <int SectorSize>
+template <size_t SectorSize>
 struct fs_checksum_sector {
     uint32_t checksum[SectorSize / 4];
 
@@ -260,7 +271,7 @@ struct fs_checksum_sector {
     }
 } __attribute__((packed));
 
-template <int SectorSize>
+template <size_t SectorSize>
 struct fs_boot_region {
     fs_volume_boot_record<SectorSize>        vbr;            // Sector 0
     fs_main_extended_boot_region<SectorSize> mebs;           // Sector 1-8
@@ -269,60 +280,69 @@ struct fs_boot_region {
     fs_checksum_sector<SectorSize>           checksum;       // Sector 11
 } __attribute__((packed));
 
-template <int SectorSize, int SectorsPerCluster, int NumClusters>
+template <size_t SectorSize, size_t SectorsPerCluster, size_t NumSectors>
 struct fs_file_allocation_table
 {
-    uint32_t media_type = 0xFFFFFFF8; // Hard drive
-    uint32_t constant   = 0xFFFFFFFF;
-    uint32_t entries[NumClusters];
-    uint8_t  padding[SectorSize - ((NumClusters * SectorsPerCluster * SectorSize) % SectorSize)] = {0};
+    static constexpr size_t NumClusters = NumSectors / SectorsPerCluster;
 
-    fs_file_allocation_table() {
+    void init()
+    {
         assert(sizeof(fs_file_allocation_table<SectorSize, SectorsPerCluster, NumClusters>) % SectorSize == 0);
+
+        media_type = 0xFFFFFFF8; // Hard drive
+        constant   = 0xFFFFFFFF; // Always 0xFFFFFFFF
+
         for (size_t i = 0; i < sizeof(entries); ++i) {
             entries[i] = i;
         }
+        memset(padding, '\0', sizeof(padding));
     }
+    uint32_t media_type;
+    uint32_t constant;
+    uint32_t entries[NumClusters];
+    uint8_t  padding[SectorSize - ((NumClusters * SectorsPerCluster * SectorSize) % SectorSize)];
 } __attribute__((packed));
 
-template <int SectorSize, int SectorsPerCluster, int NumClusters>
+template <size_t SectorSize, size_t SectorsPerCluster, size_t NumSectors>
 struct fs_allocation_bitmap_table
 {
+    static constexpr size_t NumClusters = NumSectors / SectorsPerCluster;
+
     uint8_t bitmap[(NumClusters / 8) + ((NumClusters % 8) == 0 ? 0 : 1)];
     uint8_t padding[SectorSize - (sizeof(bitmap) % SectorSize)];
 } __attribute__((packed));
 
-template <int SectorSize, int SectorsPerCluster, int NumClusters>
+template <size_t SectorSize, size_t SectorsPerCluster>
 struct fs_root_directory
 {
 } __attribute__((packed));
 
-template <int SectorSize>
+template <size_t SectorSize>
 struct fs_sector
 {
     uint8_t data[SectorSize];
 } __attribute__((packed));
 
-template <int SectorSize, int SectorsPerCluster>
+template <size_t SectorSize, size_t SectorsPerCluster>
 struct fs_cluster
 {
     fs_sector<SectorSize> sectors[SectorsPerCluster];
 } __attribute__((packed));
 
-template <int SectorSize, int SectorsPerCluster, int NumClusters>
+template <size_t SectorSize, size_t SectorsPerCluster, size_t NumSectors>
 struct fs_cluster_heap
 {
-    fs_root_directory<SectorSize, SectorsPerCluster, NumClusters>   root_directory;
-    fs_cluster<SectorSize, SectorsPerCluster>                       storage;
+    fs_root_directory<SectorSize, SectorsPerCluster>   root_directory;
+    fs_cluster<SectorSize, SectorsPerCluster>          storage;
 
 } __attribute__((packed));
 
-template <int SectorSize, int SectorsPerCluster, int NumClusters>
+template <size_t SectorSize, size_t SectorsPerCluster, size_t NumSectors>
 struct fs_filesystem {
-    fs_boot_region<SectorSize> main_boot_region;
-    fs_boot_region<SectorSize> backup_boot_region; // copy of main_boot_region
-    fs_file_allocation_table<SectorSize, SectorsPerCluster, NumClusters> fat;
-    fs_cluster_heap<SectorSize, SectorsPerCluster, NumClusters> cluster_heap;
+    fs_boot_region<SectorSize>                                          main_boot_region;
+    fs_boot_region<SectorSize>                                          backup_boot_region; // copy of main_boot_region
+    fs_file_allocation_table<SectorSize, SectorsPerCluster, NumSectors> fat;
+    fs_cluster_heap<SectorSize, SectorsPerCluster, NumSectors>          cluster_heap;
 } __attribute__((packed));
 
 
@@ -332,41 +352,50 @@ namespace github {
 namespace paulyc {
 namespace ExFATRestore {
 
+template <size_t SectorSize, size_t SectorsPerCluster, size_t NumSectors>
 class ExFATFilesystem
 {
 public:
-    ExFATFilesystem(const char *devname, size_t devsize);
+    ExFATFilesystem(const char *devname, size_t devsize, size_t partition_first_sector);
     virtual ~ExFATFilesystem();
 
     class BaseEntity
     {
     public:
-        BaseEntity(void *entry_start, int num_entries);
+        BaseEntity(void *entry_start, int num_entries, std::shared_ptr<BaseEntity> parent, const std::string &name);
         virtual ~BaseEntity() {}
 
         int get_file_info_size() const { return _num_entries * sizeof(struct fs_entry); }
         uint32_t get_start_cluster() const { return ((struct fs_stream_extension_entry *)(_fs_entries + 1))->first_cluster; }
         uint64_t get_size() const { return ((struct fs_stream_extension_entry *)(_fs_entries + 1))->size; }
-        std::string get_name() const;
+        std::string get_name() const { return _name; }
     protected:
         struct fs_entry *_fs_entries;
         int _num_entries;
         std::shared_ptr<BaseEntity> _parent;
+        std::string _name;
     };
 
     class FileEntity : public BaseEntity
     {
     public:
-        FileEntity(void *entry_start, int num_entries) : BaseEntity(entry_start, num_entries) {}
+        FileEntity(void *entry_start, int num_entries, std::shared_ptr<BaseEntity> parent, const std::string &name) : BaseEntity(entry_start, num_entries, parent, name) {}
 
-        bool is_contiguous() const { return ((struct fs_stream_extension_entry *)(_fs_entries + 1))->flags & CONTIGUOUS; }
+        bool is_contiguous() const { return ((struct fs_stream_extension_entry *)(this->_fs_entries + 1))->flags & CONTIGUOUS; }
     };
 
     class DirectoryEntity : public BaseEntity
     {
     public:
-        DirectoryEntity(void *entry_start, int num_entries) : BaseEntity(entry_start, num_entries) {}
-    private:
+        DirectoryEntity(void *entry_start, int num_entries, std::shared_ptr<BaseEntity> parent, const std::string &name);
+    protected:
+        std::list<std::shared_ptr<BaseEntity>> _children;
+    };
+
+    class RootDirectoryEntity : public DirectoryEntity
+    {
+    public:
+        RootDirectoryEntity(void *entry_start) : DirectoryEntity(entry_start, 0, nullptr, "ROOT") {}
     };
 
     std::shared_ptr<BaseEntity> loadEntity(size_t entry_offset);
@@ -379,15 +408,21 @@ private:
     int _fd;
     uint8_t *_mmap;
     size_t _devsize;
+    uint8_t *_partition_start;
+    uint8_t *_partition_end;
 
+    fs_filesystem<SectorSize, SectorsPerCluster, NumSectors> *_fs;
     std::unordered_map<uint8_t*, std::shared_ptr<BaseEntity>> _offset_to_entity_mapping;
-    //std::list<uint64_t> _bad_sector_list;
     std::shared_ptr<DirectoryEntity> _root_directory;
+    std::list<BaseEntity> _orphan_entities;
+    std::wstring_convert<std::codecvt_utf8_utf16<char16_t>, char16_t> _cvt;
 };
 
 }
 }
 }
 }
+
+#include "filesystem.cpp"
 
 #endif /* _io_github_paulyc_filesystem_hpp_ */

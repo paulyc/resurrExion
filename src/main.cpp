@@ -37,7 +37,7 @@ int main(int argc, const char * argv[]) {
     }
 
     try {
-        io::github::paulyc::ExFATRestore::ExFATFilesystem fs(argv[1], 4000000000000);
+        io::github::paulyc::ExFATRestore::ExFATFilesystem<512, 512, 7813560247>  fs(argv[1], 4000000000000, 409640);
         fs.restore_all_files(argv[3], argv[2]);
     } catch (std::exception &ex) {
         std::cerr << "Exception " << typeid(ex).name() << " caught: " << ex.what() << std::endl;
