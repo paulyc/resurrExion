@@ -46,6 +46,7 @@
 #include <list>
 
 #include "exception.hpp"
+#include "logger.hpp"
 
 enum fs_entry_flags_t {
     VALID       = 0x80,
@@ -285,7 +286,7 @@ struct fs_file_allocation_table
 {
     static constexpr size_t NumClusters = NumSectors / SectorsPerCluster;
 
-    void init()
+    fs_file_allocation_table()
     {
         assert(sizeof(fs_file_allocation_table<SectorSize, SectorsPerCluster, NumClusters>) % SectorSize == 0);
 
@@ -338,11 +339,16 @@ struct fs_cluster_heap
 } __attribute__((packed));
 
 template <size_t SectorSize, size_t SectorsPerCluster, size_t NumSectors>
-struct fs_filesystem {
+struct fs_volume_metadata {
     fs_boot_region<SectorSize>                                          main_boot_region;
     fs_boot_region<SectorSize>                                          backup_boot_region; // copy of main_boot_region
     fs_file_allocation_table<SectorSize, SectorsPerCluster, NumSectors> fat;
-    fs_cluster_heap<SectorSize, SectorsPerCluster, NumSectors>          cluster_heap;
+} __attribute__((packed));
+
+template <size_t SectorSize, size_t SectorsPerCluster, size_t NumSectors>
+struct fs_filesystem {
+    fs_volume_metadata <SectorSize, SectorsPerCluster, NumSectors>  metadata;
+    fs_cluster_heap<SectorSize, SectorsPerCluster, NumSectors>      cluster_heap;
 } __attribute__((packed));
 
 
@@ -353,7 +359,7 @@ namespace paulyc {
 namespace ExFATRestore {
 
 template <size_t SectorSize, size_t SectorsPerCluster, size_t NumSectors>
-class ExFATFilesystem
+class ExFATFilesystem : public Loggable
 {
 public:
     ExFATFilesystem(const char *devname, size_t devsize, size_t partition_first_sector);
@@ -411,6 +417,7 @@ private:
     uint8_t *_partition_start;
     uint8_t *_partition_end;
 
+    fs_volume_metadata<SectorSize, SectorsPerCluster, NumSectors> _metadata;
     fs_filesystem<SectorSize, SectorsPerCluster, NumSectors> *_fs;
     std::unordered_map<uint8_t*, std::shared_ptr<BaseEntity>> _offset_to_entity_mapping;
     std::shared_ptr<DirectoryEntity> _root_directory;
