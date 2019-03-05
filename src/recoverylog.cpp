@@ -92,7 +92,7 @@ std::string RecoveryLogBase::_get_utf8_filename(uint8_t *fh, int namelen)
         fh += 32;
         if (fh[0] == FILE_NAME) {
             struct fs_file_name_entry *n = (struct fs_file_name_entry*)fh;
-            for (int i = 0; i < exfat_name_entry_size; ++i) {
+            for (int i = 0; i < sizeof(n->name); ++i) {
                 if (u16s.length() == namelen) {
                     return _cvt.to_bytes(u16s);
                 } else {

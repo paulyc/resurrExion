@@ -72,7 +72,7 @@ std::shared_ptr<ExFATFilesystem::BaseEntity> ExFATFilesystem::loadEntity(size_t 
     struct fs_file_directory_entry *fde = (struct fs_file_directory_entry*)(buf);
     struct fs_stream_extension_entry *streamext = (struct fs_stream_extension_entry*)(buf+32);
 
-    if (fde->type != FILE_INFO1 || streamext->type != FILE_INFO2) {
+    if (fde->type != FILE_ENTRY || streamext->type != STREAM_EXTENSION) {
         std::cerr << "bad file entry types at offset " << std::hex << entry_offset << std::endl;
         return std::shared_ptr<ExFATFilesystem::BaseEntity>();
     }
@@ -101,7 +101,7 @@ std::shared_ptr<ExFATFilesystem::BaseEntity> ExFATFilesystem::loadEntity(size_t 
         return std::shared_ptr<ExFATFilesystem::BaseEntity>();
     }
 
-    if (fde->attrib & DIR) {
+    if (fde->attributes & DIRECTORY) {
         std::shared_ptr<ExFATFilesystem::DirectoryEntity> de = std::make_shared<ExFATFilesystem::DirectoryEntity>(buf, continuations + 1);
         _offset_to_entity_mapping[buf] = de;
         return de;
