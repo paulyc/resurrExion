@@ -98,29 +98,30 @@ struct fs_entry {
 
 template <size_t SectorSize>
 struct fs_volume_boot_record {
-    uint8_t  jump_boot[3]   = {0x90, 0x76, 0xEB};   // 0xEB7690 little-endian
-    uint8_t  fs_name[8]     = {'E', 'X', 'F', 'A', 'T', '\x20', '\x20', '\x20'};
-    uint8_t  zero[53]       = {0};
-    uint64_t partition_offset_sectors;              // Sector address of partition
-    uint64_t volume_length_sectors;                 // Size of total volume in sectors
-    uint32_t fat_offset_sectors;                    // Sector address of first FAT
-    uint32_t fat_length_sectors;                    // Size of FAT in sectors
-    uint32_t cluster_heap_offset_sectors;           // Sector offset of cluster heap
-    uint32_t cluster_count;                         // Number of clusters in cluster heap
-    uint32_t root_directory_cluster;                // Cluster address of root directory
+    uint8_t  jump_boot[3]               = {0x90, 0x76, 0xEB};   // 0xEB7690 little-endian
+    uint8_t  fs_name[8]                 = {'E', 'X', 'F', 'A', 'T', '\x20', '\x20', '\x20'};
+    uint8_t  zero[53]                   = {0};
+    uint64_t partition_offset_sectors;          // Sector address of partition
+    // (TODO is this the partition or the disk length? I think partition)
+    uint64_t volume_length_sectors;             // Size of total volume in sectors
+    uint32_t fat_offset_sectors;                // Sector address of first FAT
+    uint32_t fat_length_sectors;                // Size of FAT in sectors
+    uint32_t cluster_heap_offset_sectors;       // Sector offset of cluster heap
+    uint32_t cluster_count;                     // Number of clusters in cluster heap
+    uint32_t root_directory_cluster;            // Cluster address of root directory
     uint32_t volume_serial_number;
-    uint16_t fs_revision    = 0x0100;
-    uint16_t volume_flags;                          // Combination of fs_volume_flags_t
-    uint8_t  bytes_per_sector;                      // Power of two
-    uint8_t  sectors_per_cluster;                   // Power of two
+    uint16_t fs_revision                = 0x0100;
+    uint16_t volume_flags;                      // Combination of fs_volume_flags_t
+    uint8_t  bytes_per_sector;                  // Power of two
+    uint8_t  sectors_per_cluster;               // Power of two
     // Cluster size must be in range 512-4096 so bytes_per_sector + sectors_per_cluster <= 25
-    uint8_t  num_fats;                              // 1 or 2. 2 onlyfor TexFAT
-    uint8_t  drive_select;                          // Used by int 13
-    uint8_t  percent_used;                          // Percentage of heap in use
-    uint8_t  reserved0      = {0};
-    uint8_t  boot_code[390] = {0};
-    uint16_t boot_signature = 0xAA55;
-    uint8_t  padding[SectorSize - 512];                            // Padded out to sector size
+    uint8_t  num_fats                   = 1;    // 1 or 2. 2 onlyfor TexFAT (not supported)
+    uint8_t  drive_select;                      // Used by int 13
+    uint8_t  percent_used;                      // Percentage of heap in use
+    uint8_t  reserved0                  = {0};
+    uint8_t  boot_code[390]             = {0};
+    uint16_t boot_signature             = 0xAA55;
+    uint8_t  padding[SectorSize - 512] ;        // Padded out to sector size
 } __attribute__((packed));
 
 // for a 512-byte sector. should be same size as a sector
@@ -405,6 +406,8 @@ public:
     };
 
     std::shared_ptr<BaseEntity> loadEntity(size_t entry_offset);
+
+    void init_metadata();
 
     void restore_all_files(const std::string &restore_dir_name, const std::string &textlogfilename);
 

@@ -47,6 +47,8 @@ ExFATFilesystem<SectorSize, SectorsPerCluster, NumSectors>::ExFATFilesystem(cons
     if (_mmap == (uint8_t*)MAP_FAILED) {
         throw posix_exception(errno);
     }
+
+    _metadata.main_boot_region.vbr.partition_offset_sectors = partition_first_sector;
 }
 
 template <size_t SectorSize, size_t SectorsPerCluster, size_t NumSectors>
@@ -146,6 +148,12 @@ ExFATFilesystem<SectorSize, SectorsPerCluster, NumSectors>::DirectoryEntity::Dir
     std::shared_ptr<BaseEntity> parent,
     const std::string &name) :
     BaseEntity(entry_start, num_entries, parent, name)
+{
+
+}
+
+template <size_t SectorSize, size_t SectorsPerCluster, size_t NumSectors>
+void ExFATFilesystem<SectorSize, SectorsPerCluster, NumSectors>::init_metadata()
 {
 
 }

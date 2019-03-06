@@ -31,6 +31,21 @@
 
 int main(int argc, const char * argv[]) {
 #if 1
+    if (argc != 2) {
+        std::cerr << "usage: " << argv[0] << " <device>" << std::endl;
+        return -1;
+    }
+
+    try {
+        io::github::paulyc::ExFATRestore::ExFATFilesystem<512, 512, 7813560247>  fs(argv[1], 4000000000000, 409640);
+        fs.init_metadata();
+    } catch (std::exception &ex) {
+        std::cerr << "Exception " << typeid(ex).name() << " caught: " << ex.what() << std::endl;
+        return -2;
+    }
+#endif
+
+#if 0
     if (argc != 4) {
         std::cerr << "usage: " << argv[0] << " <device> <logfile> <output_dir>" << std::endl;
         return -1;
