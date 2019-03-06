@@ -1,5 +1,5 @@
 //
-//  logger.hpp - Console/file/syslog logging interface
+//  main.cpp - Test runner
 //  ExFATRestore
 //
 //  Created by Paul Ciarlo on 5 March 2019.
@@ -25,53 +25,17 @@
 //  SOFTWARE.
 //
 
-#ifndef _io_github_paulyc_logger_hpp_
-#define _io_github_paulyc_logger_hpp_
+#include <cppunit/ui/text/TestRunner.h>
+#include <cppunit/extensions/TestFactoryRegistry.h>
+#include <system_error>
 
-#if USE_LOG4CPLUS
-#include <log4cplus/logger.h>
-#include <log4cplus/loggingmacros.h>
-#include <log4cplus/configurator.h>
-#include <log4cplus/initializer.h>
-#endif
+#include "logger.hpp"
 
-#include <memory>
-#include <sstream>
-
-namespace io {
-namespace github {
-namespace paulyc {
-
-class LoggerInterface;
-
-class Loggable
+int main(int argc, char *argv[])
 {
-protected:
-    enum LogLevel {
-        TRACE    = 1,
-        DEBUG    = 2,
-        INFO     = 3,
-        WARN     = 4,
-        ERROR    = 5,
-        CRITICAL = 6
-    };
-
-    Loggable();
-    virtual ~Loggable() {}
-
-    void logf(LogLevel l, const char *fmt, ...);
-    void formatLogPrefix(std::ostringstream &prefix, LogLevel l);
-
-    void setLogLevel(LogLevel l) { _level = l; }
-
-private:
-    LogLevel _level;
-    std::string _type_str;
-};
-
-
+    CppUnit::TextUi::TestRunner runner;
+    CppUnit::TestFactoryRegistry &registry = CppUnit::TestFactoryRegistry::getRegistry();
+    runner.addTest(registry.makeTest());
+    bool wasSuccessful = runner.run("", false);
+    return !wasSuccessful;
 }
-}
-}
-
-#endif /* _io_github_paulyc_logger_hpp_ */

@@ -1,5 +1,5 @@
 //
-//  logger.hpp - Console/file/syslog logging interface
+//  logger.hpp - Console/file/syslog logging interface tests
 //  ExFATRestore
 //
 //  Created by Paul Ciarlo on 5 March 2019.
@@ -25,53 +25,26 @@
 //  SOFTWARE.
 //
 
-#ifndef _io_github_paulyc_logger_hpp_
-#define _io_github_paulyc_logger_hpp_
+#ifndef _io_github_paulyc_logger_hpp_test_
+#define _io_github_paulyc_logger_hpp_test_
 
-#if USE_LOG4CPLUS
-#include <log4cplus/logger.h>
-#include <log4cplus/loggingmacros.h>
-#include <log4cplus/configurator.h>
-#include <log4cplus/initializer.h>
-#endif
+#include <cppunit/extensions/HelperMacros.h>
 
-#include <memory>
-#include <sstream>
+#include "../src/logger.hpp"
 
-namespace io {
-namespace github {
-namespace paulyc {
-
-class LoggerInterface;
-
-class Loggable
+class LoggerTest : public CppUnit::TestFixture, public io::github::paulyc::Loggable
 {
-protected:
-    enum LogLevel {
-        TRACE    = 1,
-        DEBUG    = 2,
-        INFO     = 3,
-        WARN     = 4,
-        ERROR    = 5,
-        CRITICAL = 6
-    };
+    CPPUNIT_TEST_SUITE(LoggerTest);
+    CPPUNIT_TEST(testLog);
+    CPPUNIT_TEST_SUITE_END();
 
-    Loggable();
-    virtual ~Loggable() {}
+public:
+    void setUp() {}
+    void tearDown() {}
 
-    void logf(LogLevel l, const char *fmt, ...);
-    void formatLogPrefix(std::ostringstream &prefix, LogLevel l);
-
-    void setLogLevel(LogLevel l) { _level = l; }
-
-private:
-    LogLevel _level;
-    std::string _type_str;
+    void testLog() {
+        this->logf(INFO, "Testing logger %s\n", "something else");
+    }
 };
 
-
-}
-}
-}
-
-#endif /* _io_github_paulyc_logger_hpp_ */
+#endif /* _io_github_paulyc_logger_hpp_test_ */

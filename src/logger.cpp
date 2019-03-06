@@ -29,7 +29,7 @@
 #include <iostream>
 #include <cstdio>
 #include <cstdarg>
-#include <mutex>
+#include <future>
 
 #include "logger.hpp"
 
@@ -74,21 +74,15 @@ typedef ConsoleInterface DefaultLoggerInterface;
 #endif
 
 namespace {
-    std::once_flag init_once;
-    std::shared_ptr<DefaultLoggerInterface> logger;
+    std::future<LoggerInterface*> logger = std::async([]() -> LoggerInterface* { return new DefaultLoggerInterface; });
 
-    std::shared_ptr<LoggerInterface> getLoggerInterface()
+    LoggerInterface * getLoggerInterface()
     {
-        std::call_once(init_once, [](){ logger = std::make_shared<DefaultLoggerInterface>(); });
-        return logger;
+        return logger.get();
     }
 }
-/*
-
-*/
 
 Loggable::Loggable() :
-    _logger(getLoggerInterface()),
     _level(DEBUG),
     _type_str(typeid(this).name())
 {
@@ -99,57 +93,55 @@ void Loggable::logf(LogLevel l, const char *fmt, ...)
     if (l < _level) return;
 
     std::ostringstream prefix;
-    std::string msg;
-    msg.reserve(256);
-
-    va_list args;
-    va_start(args, fmt);
-    int n = vsnprintf((char*)msg.data(), msg.capacity(), fmt, args);
-    va_end(args);
-
-    if (n > msg.capacity()) {
-        msg.reserve(n);
-        va_start(args, fmt);
-        vsnprintf((char*)msg.data(), msg.capacity(), fmt, args);
-        va_end(args);
-    }
+    char msg[4096];
 
     formatLogPrefix(prefix, _level);
 
-    msg += prefix.str();
+    va_list args;
+    va_start(args, fmt);
+    int n = vsnprintf(msg, sizeof(msg), fmt, args);
+    va_end(args);
 
-    _logger->writeToLog(msg);
+    if (n > sizeof(msg)) {
+        char *tmpMsg = new char[n+1];
+        va_start(args, fmt);
+        vsnprintf(tmpMsg, n, fmt, args);
+        va_end(args);
+        getLoggerInterface()->writeToLog(prefix.str() + std::string(tmpMsg));
+        delete[] tmpMsg;
+    } else {
+        getLoggerInterface()->writeToLog(prefix.str() + std::string(msg));
+    }
 }
 
 void Loggable::formatLogPrefix(std::ostringstream &prefix, LogLevel l)
 {
-    std::time_t current_tm = std::time(nullptr);
-
     switch (l) {
         case TRACE:
-            prefix << "[TRACE]\t[";
+            prefix << "[TRACE]    [";
             break;
         case DEBUG:
-            prefix << "[DEBUG]\t[";
+            prefix << "[DEBUG]    [";
             break;
         case INFO:
-            prefix << "[INFO]\t[";
+            prefix << "[INFO]     [";
             break;
         case WARN:
-            prefix << "[WARN]\t[";
+            prefix << "[WARN]     [";
             break;
         case ERROR:
-            prefix << "[ERROR]\t[";
+            prefix << "[ERROR]    [";
             break;
         case CRITICAL:
-            prefix << "[CRITICAL]\t[";
+            prefix << "[CRITICAL] [";
             break;
         default:
-            prefix << "[UNKNOWN]\t[";
+            prefix << "[UNKNOWN]  [";
             break;
     }
 
-    prefix << _type_str << "]\t[" << std::put_time(std::localtime(&current_tm), "F Tz") << "] ";
+    std::time_t current_tm = std::time(nullptr);
+    prefix << std::put_time(std::localtime(&current_tm), "%F %T%z") << "] ";// << "] [" << _type_str << "] ";
 }
 
 }
