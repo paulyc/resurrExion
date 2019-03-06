@@ -314,9 +314,15 @@ struct fs_allocation_bitmap_table
     uint8_t padding[SectorSize - (sizeof(bitmap) % SectorSize)];
 } __attribute__((packed));
 
-template <size_t SectorSize, size_t SectorsPerCluster>
 struct fs_root_directory
 {
+    fs_volume_label_entry label_entry;
+    fs_allocation_bitmap_entry bitmap_entry;
+    fs_upcase_table_entry upcase_entry;
+    fs_volume_guid_entry guid_entry;
+    fs_file_directory_entry fd_entry;
+    fs_stream_extension_entry ext_entry;
+    fs_file_name_entry name_entry;
 } __attribute__((packed));
 
 template <size_t SectorSize>
@@ -334,9 +340,9 @@ struct fs_cluster
 template <size_t SectorSize, size_t SectorsPerCluster, size_t NumSectors>
 struct fs_cluster_heap
 {
-    fs_root_directory<SectorSize, SectorsPerCluster>   root_directory;
-    fs_cluster<SectorSize, SectorsPerCluster>          storage;
+    static constexpr size_t NumClusters = NumSectors / SectorsPerCluster;
 
+    fs_cluster<SectorSize, SectorsPerCluster> storage[NumClusters];
 } __attribute__((packed));
 
 template <size_t SectorSize, size_t SectorsPerCluster, size_t NumSectors>
@@ -349,6 +355,7 @@ struct fs_volume_metadata {
 template <size_t SectorSize, size_t SectorsPerCluster, size_t NumSectors>
 struct fs_filesystem {
     fs_volume_metadata <SectorSize, SectorsPerCluster, NumSectors>  metadata;
+    fs_root_directory                                               root_directory;
     fs_cluster_heap<SectorSize, SectorsPerCluster, NumSectors>      cluster_heap;
 } __attribute__((packed));
 

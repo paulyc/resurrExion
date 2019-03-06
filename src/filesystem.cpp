@@ -36,7 +36,7 @@ template <size_t SectorSize, size_t SectorsPerCluster, size_t NumSectors>
 ExFATFilesystem<SectorSize, SectorsPerCluster, NumSectors>::ExFATFilesystem(const char *devname, size_t devsize, size_t partition_first_sector) :
     _fd(-1),
     _mmap((uint8_t*)MAP_FAILED),
-    _devsize()
+    _devsize(devsize)
 {
     _fd = open(devname, O_RDONLY);
     if (_fd == -1) {
@@ -48,7 +48,8 @@ ExFATFilesystem<SectorSize, SectorsPerCluster, NumSectors>::ExFATFilesystem(cons
         throw posix_exception(errno);
     }
 
-    _metadata.main_boot_region.vbr.partition_offset_sectors = partition_first_sector;
+    _partition_start = _mmap + partition_first_sector * SectorSize;
+    _partition_end = _partition_start + (NumSectors + 1) * SectorSize;
 }
 
 template <size_t SectorSize, size_t SectorsPerCluster, size_t NumSectors>
@@ -155,7 +156,36 @@ ExFATFilesystem<SectorSize, SectorsPerCluster, NumSectors>::DirectoryEntity::Dir
 template <size_t SectorSize, size_t SectorsPerCluster, size_t NumSectors>
 void ExFATFilesystem<SectorSize, SectorsPerCluster, NumSectors>::init_metadata()
 {
+    // pretty sure this is 0 because it's the first sector in the partition, not the whole disk
+    // but i should verify
+    _metadata.main_boot_region.vbr.partition_offset_sectors = 0;
+    _metadata.main_boot_region.vbr.volume_length_sectors = NumSectors;
+    _metadata.main_boot_region.vbr.fat_offset_sectors =
+        2 * sizeof(fs_boot_region<SectorSize>) / SectorSize;
+    _metadata.main_boot_region.vbr.fat_length_sectors =
+        sizeof(fs_file_allocation_table<SectorSize, SectorsPerCluster, NumSectors>) / SectorSize;
+    _metadata.main_boot_region.vbr.cluster_heap_offset_sectors =
+        (sizeof(fs_volume_metadata <SectorSize, SectorsPerCluster, NumSectors>) + sizeof(fs_root_directory)) / SectorSize;
+    _metadata.main_boot_region.vbr.cluster_count = NumSectors / SectorsPerCluster;
+    _metadata.main_boot_region.vbr.root_directory_cluster = 0; // ??
+       // sizeof(fs_volume_metadata <SectorSize, SectorsPerCluster, NumSectors>) / (SectorSize * ClustersPerSector);// ???
+    _metadata.main_boot_region.vbr.volume_serial_number = 0; // ???
+    _metadata.main_boot_region.vbr.volume_flags = 0; // ??
 
+    // calculate log base 2 of sector size and sectors per cluster
+    size_t i = SectorSize;
+    _metadata.main_boot_region.vbr.bytes_per_sector = 0;
+    while (i >>= 1) { ++_metadata.main_boot_region.vbr.bytes_per_sector; }
+
+    _metadata.main_boot_region.vbr.sectors_per_cluster = 0;
+    i = SectorsPerCluster;
+    while (i >>= 1) { ++_metadata.main_boot_region.vbr.sectors_per_cluster; }
+
+    _metadata.main_boot_region.vbr.drive_select = 0; // ??
+    _metadata.main_boot_region.vbr.percent_used = 100;
+    _metadata.main_boot_region.checksum.calculate_checksum((uint8_t*)&_metadata.main_boot_region.vbr, sizeof(_metadata.main_boot_region.vbr));
+
+    memcpy(&_metadata.backup_boot_region, &_metadata.main_boot_region, sizeof(fs_boot_region<SectorSize>));
 }
 
 template <size_t SectorSize, size_t SectorsPerCluster, size_t NumSectors>
