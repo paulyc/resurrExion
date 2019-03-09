@@ -63,7 +63,7 @@ public:
     ExFATFilesystem(const char *devname, size_t devsize, size_t partition_first_sector);
     virtual ~ExFATFilesystem();
 
-    std::shared_ptr<BaseEntity> loadEntity(size_t entry_offset);
+    std::shared_ptr<BaseEntity> loadEntity(uint8_t *entry_offset, std::shared_ptr<BaseEntity> parent);
 
     void init_metadata();
 
@@ -82,7 +82,7 @@ private:
     fs_filesystem<SectorSize, SectorsPerCluster, NumSectors> *_fs;
     std::unordered_map<fs_entry*, std::shared_ptr<BaseEntity>> _offset_to_entity_mapping;
     std::shared_ptr<DirectoryEntity> _root_directory;
-    std::list<BaseEntity> _orphan_entities;
+    std::list<std::shared_ptr<BaseEntity>> _orphan_entities;
     std::wstring_convert<std::codecvt_utf8_utf16<char16_t>, char16_t> _cvt;
 };
 

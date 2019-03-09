@@ -66,21 +66,20 @@ ExFATFilesystem<SectorSize, SectorsPerCluster, NumSectors>::~ExFATFilesystem()
 
 template <size_t SectorSize, size_t SectorsPerCluster, size_t NumSectors>
 std::shared_ptr<BaseEntity>
-ExFATFilesystem<SectorSize, SectorsPerCluster, NumSectors>::loadEntity(size_t entry_offset)
+ExFATFilesystem<SectorSize, SectorsPerCluster, NumSectors>::loadEntity(uint8_t *entity_start, std::shared_ptr<BaseEntity> parent)
 {
-    uint8_t *buf = _mmap + entry_offset;
-    struct fs_file_directory_entry *fde = (struct fs_file_directory_entry*)(buf);
-    struct fs_stream_extension_entry *streamext = (struct fs_stream_extension_entry*)(buf+32);
-    struct fs_file_name_entry *n = (struct fs_file_name_entry*)(buf+64);
+    struct fs_file_directory_entry *fde = (struct fs_file_directory_entry*)(entity_start);
+    struct fs_stream_extension_entry *streamext = (struct fs_stream_extension_entry*)(entity_start+32);
+    struct fs_file_name_entry *n = (struct fs_file_name_entry*)(entity_start+64);
 
     if (fde->type != FILE_ENTRY || streamext->type != STREAM_EXTENSION || n->type != FILE_NAME) {
-        std::cerr << "bad file entry types at offset " << std::hex << entry_offset << std::endl;
+        std::cerr << "bad file entry types at offset " << std::hex << entity_start - _mmap << std::endl;
         return nullptr;
     }
 
     const int continuations = fde->continuations;
     if (continuations < 2 || continuations > 18) {
-        std::cerr << "bad number of continuations at offset " << std::hex << entry_offset << std::endl;
+        std::cerr << "bad number of continuations at offset " << std::hex << entity_start - _mmap << std::endl;
         return nullptr;
     }
 
@@ -89,16 +88,16 @@ ExFATFilesystem<SectorSize, SectorsPerCluster, NumSectors>::loadEntity(size_t en
 
     for (i = 0; i < 32; ++i) {
         if (i != 2 && i != 3) {
-            chksum = ((chksum << 15) | (chksum >> 1)) + buf[i];
+            chksum = ((chksum << 15) | (chksum >> 1)) + entity_start[i];
         }
     }
 
     for (; i < (continuations+1) * 32; ++i) {
-        chksum = ((chksum << 15) | (chksum >> 1)) + buf[i];
+        chksum = ((chksum << 15) | (chksum >> 1)) + entity_start[i];
     }
 
     if (chksum != fde->checksum) {
-        std::cerr << "bad file entry checksum at offset " << std::hex << entry_offset << std::endl;
+        std::cerr << "bad file entry checksum at offset " << std::hex << entity_start - _mmap << std::endl;
         return nullptr;
     }
 
@@ -117,18 +116,34 @@ ExFATFilesystem<SectorSize, SectorsPerCluster, NumSectors>::loadEntity(size_t en
         }
     }
     if (u16s.length() != namelen) {
-        std::cerr << "Warning: u16s.length() != namelen for entity at offset " << std::hex << entry_offset << std::endl;
+        std::cerr << "Warning: u16s.length() != namelen for entity at offset " << std::hex << entity_start - _mmap << std::endl;
     }
     utf8_name = _cvt.to_bytes(u16s);
 
-    // TODO load parents and children here.....
+    // load parents and children here.....
+    // orphan entities we will just stick in the root eventually ....
     if (fde->attributes & DIRECTORY) {
-        std::shared_ptr<DirectoryEntity> de = std::make_shared<DirectoryEntity>(this, buf, continuations + 1, nullptr, utf8_name);
+        std::shared_ptr<DirectoryEntity> de = std::make_shared<DirectoryEntity>(entity_start, continuations + 1, parent, utf8_name);
         _offset_to_entity_mapping[de->get_entity_start()] = de;
+        if (parent == nullptr) {
+            _orphan_entities.push_back(de);
+        }
+        uint8_t *child_entry = _fs->cluster_heap.storage[de->get_start_cluster()].sectors[0].data;
+        const uint8_t *const end_children = child_entry + de->get_size();
+        // Not tail recursive but I'm gonna go head and assume that ExFAT sets a limit on some number of
+        // directory levels before we run out of memory, at least until I'm not half-cocked and in a hurry and
+        // can figure out a more reasonable solution
+        while (child_entry < end_children) {
+            std::shared_ptr<BaseEntity> child = loadEntity(child_entry, de);
+            child_entry += child->get_file_info_size();
+        }
         return de;
     } else {
-        std::shared_ptr<FileEntity> fe = std::make_shared<FileEntity>(buf, continuations + 1, nullptr, utf8_name);
+        std::shared_ptr<FileEntity> fe = std::make_shared<FileEntity>(entity_start, continuations + 1, parent, utf8_name);
         _offset_to_entity_mapping[fe->get_entity_start()] = fe;
+        if (parent == nullptr) {
+            _orphan_entities.push_back(fe);
+        }
         return fe;
     }
 }
@@ -224,7 +239,7 @@ void ExFATFilesystem<SectorSize, SectorsPerCluster, NumSectors>::textLogToBinLog
     reader.parseTextLog(*this, [this, &writer](size_t offset, std::variant<std::string, std::exception, bool> entry_info) {
         if (std::holds_alternative<std::string>(entry_info)) {
             // File entry
-            std::shared_ptr<BaseEntity> entity = loadEntity(offset);
+            std::shared_ptr<BaseEntity> entity = loadEntity(_mmap + offset, nullptr);
             if (entity) {
                 writer.writeEntityToBinLog(offset, _mmap + offset, entity);
             } else {
