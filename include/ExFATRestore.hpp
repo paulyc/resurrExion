@@ -1,8 +1,8 @@
 //
-//  main.cpp - Test runner
+//  ExFATRestore.hpp - main include file for app
 //  ExFATRestore
 //
-//  Created by Paul Ciarlo on 5 March 2019.
+//  Created by Paul Ciarlo on 9 March 2019.
 //
 //  Copyright (C) 2019 Paul Ciarlo <paul.ciarlo@gmail.com>.
 //
@@ -25,17 +25,13 @@
 //  SOFTWARE.
 //
 
-#include <cppunit/ui/text/TestRunner.h>
-#include <cppunit/extensions/TestFactoryRegistry.h>
-#include <system_error>
+#include "../src/exfat_structs.hpp"
+#include "../src/logger.hpp"
+#include "../src/exception.hpp"
+#include "../src/entity.hpp"
+#include "../src/recoverylog.hpp"
+#include "../src/filesystem.hpp"
 
-#include <ExFATRestore.hpp>
-
-int main(int argc, char *argv[])
-{
-    CppUnit::TextUi::TestRunner runner;
-    CppUnit::TestFactoryRegistry &registry = CppUnit::TestFactoryRegistry::getRegistry();
-    runner.addTest(registry.makeTest());
-    bool wasSuccessful = runner.run("", false);
-    return !wasSuccessful;
-}
+#include "../src/recoverylog.cpp"
+#include "../src/filesystem.cpp"
+#include "../src/entity.cpp"

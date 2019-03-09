@@ -1,8 +1,8 @@
 //
-//  main.cpp - Test runner
+//  entity.cpp - File/Directory Entity on Disk
 //  ExFATRestore
 //
-//  Created by Paul Ciarlo on 5 March 2019.
+//  Created by Paul Ciarlo on 9 March 2019.
 //
 //  Copyright (C) 2019 Paul Ciarlo <paul.ciarlo@gmail.com>.
 //
@@ -25,17 +25,32 @@
 //  SOFTWARE.
 //
 
-#include <cppunit/ui/text/TestRunner.h>
-#include <cppunit/extensions/TestFactoryRegistry.h>
-#include <system_error>
+namespace io {
+namespace github {
+namespace paulyc {
+namespace ExFATRestore {
 
-#include <ExFATRestore.hpp>
+#include "logger.hpp"
 
-int main(int argc, char *argv[])
+BaseEntity::BaseEntity(void *entry_start, int num_entries, std::shared_ptr<BaseEntity> parent, const std::string &name) :
+    _fs_entries((struct fs_entry *)entry_start),
+    _num_entries(num_entries),
+    _parent(parent),
+    _name(name)
 {
-    CppUnit::TextUi::TestRunner runner;
-    CppUnit::TestFactoryRegistry &registry = CppUnit::TestFactoryRegistry::getRegistry();
-    runner.addTest(registry.makeTest());
-    bool wasSuccessful = runner.run("", false);
-    return !wasSuccessful;
+}
+
+DirectoryEntity::DirectoryEntity(
+    void *entry_start,
+    int num_entries,
+    std::shared_ptr<BaseEntity> parent,
+    const std::string &name) :
+    BaseEntity(entry_start, num_entries, parent, name)
+{
+
+}
+
+}
+}
+}
 }

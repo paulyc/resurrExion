@@ -202,6 +202,4 @@ private:
 }
 }
 
-#include "recoverylog.cpp"
-
 #endif /* _io_github_paulyc_recoverylog_hpp_ */

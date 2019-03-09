@@ -65,7 +65,7 @@ ExFATFilesystem<SectorSize, SectorsPerCluster, NumSectors>::~ExFATFilesystem()
 }
 
 template <size_t SectorSize, size_t SectorsPerCluster, size_t NumSectors>
-std::shared_ptr<typename ExFATFilesystem<SectorSize, SectorsPerCluster, NumSectors>::BaseEntity>
+std::shared_ptr<BaseEntity>
 ExFATFilesystem<SectorSize, SectorsPerCluster, NumSectors>::loadEntity(size_t entry_offset)
 {
     uint8_t *buf = _mmap + entry_offset;
@@ -81,7 +81,7 @@ ExFATFilesystem<SectorSize, SectorsPerCluster, NumSectors>::loadEntity(size_t en
     const int continuations = fde->continuations;
     if (continuations < 2 || continuations > 18) {
         std::cerr << "bad number of continuations at offset " << std::hex << entry_offset << std::endl;
-        return std::shared_ptr<ExFATFilesystem::BaseEntity>();
+        return nullptr;
     }
 
     int i;
@@ -99,7 +99,7 @@ ExFATFilesystem<SectorSize, SectorsPerCluster, NumSectors>::loadEntity(size_t en
 
     if (chksum != fde->checksum) {
         std::cerr << "bad file entry checksum at offset " << std::hex << entry_offset << std::endl;
-        return std::shared_ptr<ExFATFilesystem::BaseEntity>();
+        return nullptr;
     }
 
     std::basic_string<char16_t> u16s;
@@ -123,34 +123,14 @@ ExFATFilesystem<SectorSize, SectorsPerCluster, NumSectors>::loadEntity(size_t en
 
     // TODO load parents and children here.....
     if (fde->attributes & DIRECTORY) {
-        std::shared_ptr<DirectoryEntity> de = std::make_shared<DirectoryEntity>(buf, continuations + 1, nullptr, utf8_name);
-        _offset_to_entity_mapping[buf] = de;
+        std::shared_ptr<DirectoryEntity> de = std::make_shared<DirectoryEntity>(this, buf, continuations + 1, nullptr, utf8_name);
+        _offset_to_entity_mapping[de->get_entity_start()] = de;
         return de;
     } else {
         std::shared_ptr<FileEntity> fe = std::make_shared<FileEntity>(buf, continuations + 1, nullptr, utf8_name);
-        _offset_to_entity_mapping[buf] = fe;
+        _offset_to_entity_mapping[fe->get_entity_start()] = fe;
         return fe;
     }
-}
-
-template <size_t SectorSize, size_t SectorsPerCluster, size_t NumSectors>
-ExFATFilesystem<SectorSize, SectorsPerCluster, NumSectors>::BaseEntity::BaseEntity(void *entry_start, int num_entries, std::shared_ptr<BaseEntity> parent, const std::string &name) :
-    _fs_entries((struct fs_entry *)entry_start),
-    _num_entries(num_entries),
-    _parent(parent),
-    _name(name)
-{
-}
-
-template <size_t SectorSize, size_t SectorsPerCluster, size_t NumSectors>
-ExFATFilesystem<SectorSize, SectorsPerCluster, NumSectors>::DirectoryEntity::DirectoryEntity(
-    void *entry_start,
-    int num_entries,
-    std::shared_ptr<BaseEntity> parent,
-    const std::string &name) :
-    BaseEntity(entry_start, num_entries, parent, name)
-{
-
 }
 
 template <size_t SectorSize, size_t SectorsPerCluster, size_t NumSectors>
