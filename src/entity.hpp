@@ -60,6 +60,12 @@ public:
     std::string get_name() const {
         return _name;
     }
+    std::shared_ptr<BaseEntity> get_parent() const {
+        return _parent;
+    }
+    void set_parent(std::shared_ptr<BaseEntity> parent) {
+        _parent = parent;
+    }
 protected:
     struct fs_entry *_fs_entries;
     int _num_entries;

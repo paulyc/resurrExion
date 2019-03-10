@@ -122,12 +122,27 @@ ExFATFilesystem<SectorSize, SectorsPerCluster, NumSectors>::loadEntity(uint8_t *
 
     // load parents and children here.....
     // orphan entities we will just stick in the root eventually ....
-    if (fde->attributes & DIRECTORY) {
-        std::shared_ptr<DirectoryEntity> de = std::make_shared<DirectoryEntity>(entity_start, continuations + 1, parent, utf8_name);
-        _offset_to_entity_mapping[de->get_entity_start()] = de;
-        if (parent == nullptr) {
-            _orphan_entities.push_back(de);
+    //std::shared_ptr<BaseEntity> entity;
+    // first see if we already loaded this entity
+    std::unordered_map<fs_entry*, std::shared_ptr<BaseEntity>>::iterator entityit =
+        _offset_to_entity_mapping.find(entity_start);
+    if (entityit != _offset_to_entity_mapping.end()) {
+        if (entityit->second->get_parent() == nullptr) {
+            if (parent != nullptr) {
+				entityit->second->set_parent(parent);
+            }
+        } else {
+            if (parent != nullptr) {
+                logf(WARN, "entity at offset %016xull already has a parent\n", entity_start - _mmap);
+            }
         }
+        return entityit->second;
+    }
+
+    if (fde->attributes & DIRECTORY) {
+        std::shared_ptr<DirectoryEntity> de =
+            std::make_shared<DirectoryEntity>(entity_start, continuations + 1, parent, utf8_name);
+        _offset_to_entity_mapping[de->get_entity_start()] = de;
         uint8_t *child_entry = _fs->cluster_heap.storage[de->get_start_cluster()].sectors[0].data;
         const uint8_t *const end_children = child_entry + de->get_size();
         // Not tail recursive but I'm gonna go head and assume that ExFAT sets a limit on some number of
@@ -139,11 +154,9 @@ ExFATFilesystem<SectorSize, SectorsPerCluster, NumSectors>::loadEntity(uint8_t *
         }
         return de;
     } else {
-        std::shared_ptr<FileEntity> fe = std::make_shared<FileEntity>(entity_start, continuations + 1, parent, utf8_name);
+        std::shared_ptr<FileEntity> fe =
+            std::make_shared<FileEntity>(entity_start, continuations + 1, parent, utf8_name);
         _offset_to_entity_mapping[fe->get_entity_start()] = fe;
-        if (parent == nullptr) {
-            _orphan_entities.push_back(fe);
-        }
         return fe;
     }
 }
@@ -181,6 +194,12 @@ void ExFATFilesystem<SectorSize, SectorsPerCluster, NumSectors>::init_metadata()
     _metadata.main_boot_region.checksum.calculate_checksum((uint8_t*)&_metadata.main_boot_region.vbr, sizeof(_metadata.main_boot_region.vbr));
 
     memcpy(&_metadata.backup_boot_region, &_metadata.main_boot_region, sizeof(fs_boot_region<SectorSize>));
+
+    // iterate over all entities, fill root directory with every entity not having a parent
+    // mark every sector allocated in the FAT and allocation table to account for unknown
+    // fragmented files
+
+    // copy metadata and root directory into fs mmap
 }
 
 template <size_t SectorSize, size_t SectorsPerCluster, size_t NumSectors>

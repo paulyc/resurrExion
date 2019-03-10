@@ -78,11 +78,10 @@ private:
     uint8_t *_partition_start;
     uint8_t *_partition_end;
 
-    fs_volume_metadata<SectorSize, SectorsPerCluster, NumSectors> _metadata;
-    fs_filesystem<SectorSize, SectorsPerCluster, NumSectors> *_fs;
+    fs_volume_metadata<SectorSize, SectorsPerCluster, NumSectors> _metadata; // not part of actual fs
+    fs_filesystem<SectorSize, SectorsPerCluster, NumSectors> *_fs; // actual mmaped filesystem
     std::unordered_map<fs_entry*, std::shared_ptr<BaseEntity>> _offset_to_entity_mapping;
-    std::shared_ptr<DirectoryEntity> _root_directory;
-    std::list<std::shared_ptr<BaseEntity>> _orphan_entities;
+    std::unique_ptr<RootDirectoryEntity> _root_directory_tpl;
     std::wstring_convert<std::codecvt_utf8_utf16<char16_t>, char16_t> _cvt;
 };
 

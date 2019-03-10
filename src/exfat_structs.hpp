@@ -338,9 +338,14 @@ struct fs_volume_metadata {
 
 template <size_t SectorSize, size_t SectorsPerCluster, size_t NumSectors>
 struct fs_filesystem {
-    fs_volume_metadata <SectorSize, SectorsPerCluster, NumSectors>  metadata;
-    fs_root_directory                                               root_directory;
-    fs_cluster_heap<SectorSize, SectorsPerCluster, NumSectors>      cluster_heap;
+    // check on this.. I think the metadata is really considered part of the fs clusters
+    union {
+        struct {
+            fs_volume_metadata <SectorSize, SectorsPerCluster, NumSectors>  metadata;
+            fs_root_directory                                               root_directory;
+        };
+        fs_cluster_heap<SectorSize, SectorsPerCluster, NumSectors>      	cluster_heap;
+    };
 } __attribute__((packed));
 
 #endif /* _io_github_paulyc_exfat_structs_hpp_ */
