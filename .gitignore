@@ -36,3 +36,4 @@ xcuserdata
 build
 
 *.kdev4
+xcodebuild

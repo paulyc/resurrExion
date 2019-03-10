@@ -25,6 +25,10 @@
 //  SOFTWARE.
 //
 
+#if USE_CPPUNIT
+
 #include "logger.hpp"
 
 CPPUNIT_TEST_SUITE_REGISTRATION(LoggerTest);
+
+#endif /* USE_CPPUNIT */

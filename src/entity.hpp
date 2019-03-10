@@ -32,6 +32,7 @@
 
 #include <list>
 #include <string>
+#include <memory>
 
 namespace io {
 namespace github {

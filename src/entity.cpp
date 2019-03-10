@@ -25,12 +25,12 @@
 //  SOFTWARE.
 //
 
+#include "entity.hpp"
+
 namespace io {
 namespace github {
 namespace paulyc {
 namespace ExFATRestore {
-
-#include "logger.hpp"
 
 BaseEntity::BaseEntity(void *entry_start, int num_entries, std::shared_ptr<BaseEntity> parent, const std::string &name) :
     _fs_entries((struct fs_entry *)entry_start),

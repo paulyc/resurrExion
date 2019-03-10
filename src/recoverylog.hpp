@@ -36,6 +36,8 @@
 #include <codecvt>
 #include <regex>
 
+#include "logger.hpp"
+
 namespace io {
 namespace github {
 namespace paulyc {
@@ -59,7 +61,7 @@ constexpr int exfat_filename_maxlen_utf8 = exfat_filename_maxlen * 2;
 static constexpr int32_t BadSectorFlag = -1;
 
 template <typename Filesystem_T>
-class RecoveryLogBase
+class RecoveryLogBase : public Loggable
 {
 public:
     RecoveryLogBase(const std::string &filename) : _filename(filename) {}
@@ -201,5 +203,7 @@ private:
 }
 }
 }
+
+#include "recoverylog.cpp"
 
 #endif /* _io_github_paulyc_recoverylog_hpp_ */

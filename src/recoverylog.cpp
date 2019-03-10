@@ -25,26 +25,17 @@
 //  SOFTWARE.
 //
 
-#if 0
-
-#include "filesystem.hpp"
-#include "recoverylog.hpp"
-#include "exception.hpp"
-
-#include <sstream>
-#include <cstdio>
-#include <cstring>
-#include <iomanip>
-#include <regex>
+#include <stdio.h>
+#include <string.h>
 
 #include <sys/mman.h>
 #include <unistd.h>
 
+#include <sstream>
+#include <iomanip>
+#include <regex>
+
 using namespace io::github::paulyc::ExFATRestore;
-
-template <typename Filesystem_T>
-std::string RecoveryLogBase<Filesystem_T>::_get_utf8_filename(uint8_t *fh, int namelen)
-
 
 template <typename Filesystem_T>
 void RecoveryLogTextWriter<Filesystem_T>::writeTextLog(
@@ -147,5 +138,3 @@ void RecoveryLogTextWriter<Filesystem_T>::writeTextLog(
     log.close();
 #endif
 }
-
-#endif

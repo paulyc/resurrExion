@@ -73,13 +73,13 @@ ExFATFilesystem<SectorSize, SectorsPerCluster, NumSectors>::loadEntity(uint8_t *
     struct fs_file_name_entry *n = (struct fs_file_name_entry*)(entity_start+64);
 
     if (fde->type != FILE_ENTRY || streamext->type != STREAM_EXTENSION || n->type != FILE_NAME) {
-        std::cerr << "bad file entry types at offset " << std::hex << entity_start - _mmap << std::endl;
+        logf(WARN, "bad number of continuations at offset %016xull\n", entity_start - _mmap);
         return nullptr;
     }
 
     const int continuations = fde->continuations;
     if (continuations < 2 || continuations > 18) {
-        std::cerr << "bad number of continuations at offset " << std::hex << entity_start - _mmap << std::endl;
+        logf(WARN, "bad number of continuations at offset %016xull\n", entity_start - _mmap);
         return nullptr;
     }
 
@@ -97,7 +97,7 @@ ExFATFilesystem<SectorSize, SectorsPerCluster, NumSectors>::loadEntity(uint8_t *
     }
 
     if (chksum != fde->checksum) {
-        std::cerr << "bad file entry checksum at offset " << std::hex << entity_start - _mmap << std::endl;
+        logf(WARN, "bad file entry checksum at offset %016xull\n", entity_start - _mmap);
         return nullptr;
     }
 
@@ -116,7 +116,7 @@ ExFATFilesystem<SectorSize, SectorsPerCluster, NumSectors>::loadEntity(uint8_t *
         }
     }
     if (u16s.length() != namelen) {
-        std::cerr << "Warning: u16s.length() != namelen for entity at offset " << std::hex << entity_start - _mmap << std::endl;
+        logf(WARN, "u16s.length() != namelen for entity at offset %016xull\n", entity_start - _mmap);
     }
     utf8_name = _cvt.to_bytes(u16s);
 
@@ -194,7 +194,7 @@ void ExFATFilesystem<SectorSize, SectorsPerCluster, NumSectors>::restore_all_fil
             const std::string filename = std::get<std::string>(entry_info);
             std::shared_ptr<FileEntity> ent = std::dynamic_pointer_cast<FileEntity>(loadEntity(offset));
             if (!ent) {
-                std::cerr << "Invalid file entry at offset " << offset << std::endl;
+                logf(WARN, "Invalid file entry at offset %016xull\n", offset);
                 return;
             }
             if (ent->is_contiguous()) {
@@ -202,21 +202,19 @@ void ExFATFilesystem<SectorSize, SectorsPerCluster, NumSectors>::restore_all_fil
                 const uint32_t start_cluster = ent->get_start_cluster();
                 const size_t file_offset = start_cluster * cluster_size_bytes + cluster_heap_disk_start_sector * sector_size_bytes;
                 const size_t file_size = ent->get_size();
-                std::cout << "recovering file " << filename <<
-                    " at cluster offset " << start_cluster <<
-                    " disk offset " << file_offset <<
-                    " size " << file_size << std::endl;
+                logf(INFO, "recovering file %s at cluster offset %08xu disk offset %016xull size %d\n",
+                     filename, start_cluster, file_offset, file_size);
                 restored_file.write((const char *)(_mmap + file_offset), file_size);
                 restored_file.close();
             } else {
-                std::cerr << "Non-contiguous file: " << filename << std::endl;
+                logf(WARN, "Non-contiguous file: %s\n", filename);
             }
         } else if (std::holds_alternative<bool>(entry_info)) {
             // Bad sector, don't care
         } else {
             // Exception
             std::exception &ex = std::get<std::exception>(entry_info);
-            std::cerr << "entry_info had " << typeid(ex).name() << " with message: " << ex.what() << std::endl;
+            logf(WARN, "entry_info had exception type %s with message %s\n", typeid(ex).name(), ex.what());
         }
     });
 }
@@ -233,8 +231,8 @@ void ExFATFilesystem<SectorSize, SectorsPerCluster, NumSectors>::textLogToBinLog
     const std::string &textlogfilename,
     const std::string &binlogfilename)
 {
-    RecoveryLogTextReader reader(textlogfilename);
-    RecoveryLogBinaryWriter writer(binlogfilename);
+    RecoveryLogTextReader<ExFATFilesystem<SectorSize, SectorsPerCluster, NumSectors>> reader(textlogfilename);
+    RecoveryLogBinaryWriter<ExFATFilesystem<SectorSize, SectorsPerCluster, NumSectors>> writer(binlogfilename);
 
     reader.parseTextLog(*this, [this, &writer](size_t offset, std::variant<std::string, std::exception, bool> entry_info) {
         if (std::holds_alternative<std::string>(entry_info)) {
@@ -243,7 +241,7 @@ void ExFATFilesystem<SectorSize, SectorsPerCluster, NumSectors>::textLogToBinLog
             if (entity) {
                 writer.writeEntityToBinLog(offset, _mmap + offset, entity);
             } else {
-                std::cerr << "failed to loadEntity at " << std::hex << offset << std::endl;
+                logf(WARN, "failed to loadEntity at offset %016ull\n", offset);
             }
         } else if (std::holds_alternative<bool>(entry_info)) {
             // Bad sector
@@ -251,7 +249,7 @@ void ExFATFilesystem<SectorSize, SectorsPerCluster, NumSectors>::textLogToBinLog
         } else {
             // Exception
             std::exception &ex = std::get<std::exception>(entry_info);
-            std::cerr << "entry_info had " << typeid(ex).name() << " with message: " << ex.what() << std::endl;
+            logf(WARN, "entry_info had exception type %s with message %s\n", typeid(ex).name(), ex.what());
         }
     });
 }

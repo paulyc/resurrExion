@@ -91,4 +91,6 @@ private:
 }
 }
 
+#include "filesystem.cpp"
+
 #endif /* _io_github_paulyc_filesystem_hpp_ */

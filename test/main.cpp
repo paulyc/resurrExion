@@ -25,11 +25,13 @@
 //  SOFTWARE.
 //
 
+#include <iostream>
+
+#if USE_CPPUNIT
+
 #include <cppunit/ui/text/TestRunner.h>
 #include <cppunit/extensions/TestFactoryRegistry.h>
 #include <system_error>
-
-#include <ExFATRestore.hpp>
 
 int main(int argc, char *argv[])
 {
@@ -39,3 +41,13 @@ int main(int argc, char *argv[])
     bool wasSuccessful = runner.run("", false);
     return !wasSuccessful;
 }
+
+#else
+
+int main(int argc, char *argv[])
+{
+    std::cerr << "No tests run, #define USE_CPPUNIT" << std::endl;
+    return 0;
+}
+
+#endif

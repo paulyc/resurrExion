@@ -28,9 +28,9 @@
 #ifndef _io_github_paulyc_exfat_structs_hpp_
 #define _io_github_paulyc_exfat_structs_hpp_
 
-#include <cassert>
-#include <cstdint>
-#include <cstring>
+#include <assert.h>
+#include <stdint.h>
+#include <string.h>
 
 enum fs_entry_flags_t {
     VALID       = 0x80,
