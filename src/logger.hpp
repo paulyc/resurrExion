@@ -46,7 +46,7 @@ class LoggerInterface;
 
 class Loggable
 {
-protected:
+public:
     enum LogLevel {
         TRACE    = 1,
         DEBUG    = 2,
@@ -63,7 +63,6 @@ protected:
     void formatLogPrefix(std::ostringstream &prefix, LogLevel l);
 
     void setLogLevel(LogLevel l) { _level = l; }
-
 private:
     LogLevel _level;
     std::string _type_str;

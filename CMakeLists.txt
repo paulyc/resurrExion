@@ -40,13 +40,26 @@ find_library(FOUND_CPPUNIT cppunit)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DUSE_CPPUNIT")
 endif()
 
-add_executable(
-	ExFATRestoreTest
-
+set(TEST_COMPILE_SOURCES
 	src/logger.cpp
 	test/logger.cpp
 	test/main.cpp
+	test/filesystem.cpp
 )
+
+set(TEST_NO_COMPILE_SOURCES
+	test/logger.hpp
+	test/filesystem.hpp
+)
+
+add_executable(
+	ExFATRestoreTest
+
+	${TEST_COMPILE_SOURCES}
+	${TEST_NO_COMPILE_SOURCES}
+)
+
+set_source_files_properties(${TEST_NO_COMPILE_SOURCES} PROPERTIES HEADER_FILE_ONLY TRUE)
 
 if(USE_CPPUNIT)
 target_link_libraries(ExFATRestoreTest cppunit pthread)

@@ -32,7 +32,7 @@ namespace github {
 namespace paulyc {
 namespace ExFATRestore {
 
-BaseEntity::BaseEntity(void *entry_start, int num_entries, std::shared_ptr<BaseEntity> parent, const std::string &name) :
+BaseEntity::BaseEntity(void *entry_start, uint8_t num_entries, std::shared_ptr<BaseEntity> parent, const std::string &name) :
     _fs_entries((struct fs_entry *)entry_start),
     _num_entries(num_entries),
     _parent(parent),

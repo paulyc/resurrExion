@@ -39,10 +39,11 @@ enum fs_entry_flags_t {
 };
 
 enum fs_directory_entry_t {
+    END_OF_DIRECTORY    = 0x00,
     ALLOCATION_BITMAP   = 0x01 | VALID,                         // 0x81
     UPCASE_TABLE        = 0x02 | VALID,                         // 0x82
     VOLUME_LABEL        = 0x03 | VALID,                         // 0x83
-    FILE_ENTRY          = 0x05 | VALID,                         // 0x85
+    FILE_DIR_ENTRY      = 0x05 | VALID,                         // 0x85
     VOLUME_GUID         = 0x20 | VALID,                         // 0xA0
     TEXFAT_PADDING      = 0x21 | VALID,                         // 0xA1
     WINDOWS_CE_ACT      = 0x22 | VALID,                         // 0xA2
@@ -52,24 +53,12 @@ enum fs_directory_entry_t {
 };
 
 enum fs_attrib_flags_t {
-    READ_ONLY   = 0x01,
-    HIDDEN      = 0x02,
-    SYSTEM      = 0x04,
-    VOLUME      = 0x08,
-    DIRECTORY   = 0x10,
-    ARCH        = 0x20
-};
-
-enum fs_file_flags_t {
-    ALLOC_POSSIBLE  = 0x01,
-    CONTIGUOUS      = 0x02
-};
-
-enum fs_volume_flags_t {
-    SECOND_FAT_ACTIVE   = 0x01,
-    VOLUME_DIRTY        = 0x02,
-    MEDIA_FAILURE       = 0x04,
-    CLEAR_TO_ZERO       = 0x08
+    READ_ONLY   = 1<<0,
+    HIDDEN      = 1<<1,
+    SYSTEM      = 1<<2,
+    VOLUME      = 1<<3,
+    DIRECTORY   = 1<<4,
+    ARCH        = 1<<5
 };
 
 struct fs_bios_parameter_block {
@@ -79,6 +68,13 @@ struct fs_entry {
     uint8_t type;
     uint8_t data[31];
 } __attribute__((packed));
+
+enum fs_volume_flags_t {
+    SECOND_FAT_ACTIVE   = 1<<0,
+    VOLUME_DIRTY        = 1<<1,
+    MEDIA_FAILURE       = 1<<2,
+    CLEAR_TO_ZERO       = 1<<3
+};
 
 template <size_t SectorSize>
 struct fs_volume_boot_record {
@@ -168,7 +164,7 @@ struct fs_file_attributes {
 } __attribute__((packed));
 
 struct fs_file_directory_entry {
-    uint8_t  type               = FILE_ENTRY;              // FILE_ENTRY = 0x85
+    uint8_t  type               = FILE_DIR_ENTRY;   // FILE_DIR_ENTRY = 0x85
     uint8_t  continuations;
     uint16_t checksum;
     uint16_t attributes;
@@ -183,6 +179,29 @@ struct fs_file_directory_entry {
     uint8_t  modified_time_cs;
     uint8_t  accessed_time_cs;
     uint8_t  reserved1[9]       = {0};
+} __attribute__((packed));
+
+enum fs_file_flags_t {
+    ALLOC_POSSIBLE  = 1<<0, // if 0, first cluster and data length will be undefined in directory entry
+    CONTIGUOUS      = 1<<1
+};
+
+struct fs_primary_directory_entry {
+    uint8_t  type;              // one of fs_directory_entry_t
+    uint8_t  secondary_count;   // 0 - 255, number of children in directory
+    uint16_t set_checksum;      // checksum of directory entries in this set, excluding this field
+    uint8_t  primary_flags;     // combination of fs_file_flags_t
+    uint8_t  reserved[14] = {0};
+    uint32_t first_cluster;
+    uint64_t data_length;
+} __attribute__((packed));
+
+struct fs_secondary_directory_entry {
+    uint8_t  type;              // one of fs_directory_entry_t
+    uint8_t  secondary_flags;   // combination of fs_file_flags_t
+    uint8_t  reserved[18]   = {0};
+    uint32_t first_cluster;
+    uint64_t data_length;
 } __attribute__((packed));
 
 struct fs_stream_extension_entry {
@@ -207,21 +226,31 @@ struct fs_file_name_entry {
 } __attribute__((packed));
 
 struct fs_allocation_bitmap_entry {
-    uint8_t type = ALLOCATION_BITMAP;
-    uint8_t bitmap_flags; // 0 if first allocation bitmap, 1 if second (TexFAT only)
-    uint8_t reserved[18] = {0};
+    uint8_t type            = ALLOCATION_BITMAP;
+    uint8_t bitmap_flags;   // 0 if first allocation bitmap, 1 if second (TexFAT only)
+    uint8_t reserved[18]    = {0};
     uint32_t first_cluster; // First data cluster number
     uint64_t data_length;   // Size of allocation bitmap in bytes. Ceil(ClusterCount / 8)
 } __attribute__((packed));
 
+enum fs_volume_guid_flags {
+    ALLOCATION_POSSIBLE = 1<<0, // must be 0
+    NO_FAT_CHAIN        = 1<<1  // must be 0
+};
+
 struct fs_volume_guid_entry {
-    uint8_t type = VOLUME_GUID;
+    uint8_t  type               = VOLUME_GUID; // 0xA0
+    uint8_t  secondary_count    = 0;
+    uint16_t set_checksum;
+    uint16_t flags              = 0;    // combination of fs_volume_guid_flags, must be 0
+    uint8_t  volume_guid[16];           // must not be null
+    uint8_t  reserved[10]       = {0};
 } __attribute__((packed));
 
 struct fs_volume_label_entry {
     uint8_t type                = VOLUME_LABEL; // 0x83 if volume label exists or 0x03 if it was deleted
-    uint8_t character_count;                    // characters in label
-    uint16_t volume_label[11];
+    uint8_t character_count     = 0;            // characters in label
+    uint16_t volume_label[11]   = {0};
     uint8_t reserved[8]         = {0};
 } __attribute__((packed));
 
@@ -298,15 +327,25 @@ struct fs_allocation_bitmap_table
     uint8_t padding[SectorSize - (sizeof(bitmap) % SectorSize)];
 } __attribute__((packed));
 
+struct fs_root_directory_metadata {
+    fs_volume_label_entry       label_entry;
+    fs_allocation_bitmap_entry  bitmap_entry;
+    fs_upcase_table_entry       upcase_entry;
+    fs_volume_guid_entry        guid_entry;
+    fs_file_directory_entry     directory_entry;
+    fs_stream_extension_entry   ext_entry;
+    fs_file_name_entry          name_entry;
+} __attribute__((packed));
+
+template <size_t SectorSize, size_t SectorsPerCluster>
 struct fs_root_directory
 {
-    fs_volume_label_entry label_entry;
-    fs_allocation_bitmap_entry bitmap_entry;
-    fs_upcase_table_entry upcase_entry;
-    fs_volume_guid_entry guid_entry;
-    fs_file_directory_entry fd_entry;
-    fs_stream_extension_entry ext_entry;
-    fs_file_name_entry name_entry;
+    static constexpr size_t ClusterSize = SectorSize * SectorsPerCluster;
+    static constexpr size_t NumDirectoryEntries = (ClusterSize - sizeof(fs_root_directory_metadata)) / sizeof(fs_entry);
+
+    fs_root_directory_metadata metadata;
+    fs_entry directory_entries[NumDirectoryEntries];
+    uint8_t padding[ClusterSize - ((sizeof(fs_root_directory_metadata) + sizeof(fs_entry)*NumDirectoryEntries) % ClusterSize)]; // padded out to cluster???
 } __attribute__((packed));
 
 template <size_t SectorSize>
@@ -331,21 +370,21 @@ struct fs_cluster_heap
 
 template <size_t SectorSize, size_t SectorsPerCluster, size_t NumSectors>
 struct fs_volume_metadata {
+    static constexpr size_t ClusterSize = SectorSize * SectorsPerCluster;
+
     fs_boot_region<SectorSize>                                          main_boot_region;
     fs_boot_region<SectorSize>                                          backup_boot_region; // copy of main_boot_region
     fs_file_allocation_table<SectorSize, SectorsPerCluster, NumSectors> fat;
+
+    //fs_cluster<SectorSize, SectorsPerCluster> reserved_cluster;
+    //uint8_t padding[ClusterSize - (2*sizeof(fs_boot_region<SectorSize>) + sizeof(fs_file_allocation_table<SectorSize, SectorsPerCluster, NumSectors>) + sizeof(fs_cluster<SectorSize, SectorsPerCluster>)) % ClusterSize]; // pad out to cluster???
 } __attribute__((packed));
 
 template <size_t SectorSize, size_t SectorsPerCluster, size_t NumSectors>
 struct fs_filesystem {
-    // check on this.. I think the metadata is really considered part of the fs clusters
-    union {
-        struct {
-            fs_volume_metadata <SectorSize, SectorsPerCluster, NumSectors>  metadata;
-            fs_root_directory                                               root_directory;
-        };
-        fs_cluster_heap<SectorSize, SectorsPerCluster, NumSectors>      	cluster_heap;
-    };
+    fs_volume_metadata<SectorSize, SectorsPerCluster, NumSectors>   metadata;
+    fs_root_directory<SectorSize, SectorsPerCluster>                root_directory;
+    fs_cluster_heap<SectorSize, SectorsPerCluster, NumSectors>      cluster_heap;
 } __attribute__((packed));
 
 #endif /* _io_github_paulyc_exfat_structs_hpp_ */

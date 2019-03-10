@@ -44,9 +44,22 @@ int main(int argc, char *argv[])
 
 #else
 
+#include "../src/logger.hpp"
+#include "../src/filesystem.hpp"
+
+using namespace io::github::paulyc;
+
 int main(int argc, char *argv[])
 {
-    std::cerr << "No tests run, #define USE_CPPUNIT" << std::endl;
+    Loggable l;
+    l.logf(Loggable::INFO, "No tests run, #define USE_CPPUNIT\n");
+    //std::cerr << "No tests run, #define USE_CPPUNIT" << std::endl;
+
+    // TODO figure this out....
+    const size_t cluster_heap_sector_offset_expected = cluster_heap_partition_start_sector;
+    const size_t cluster_heap_sector_offset_calculated =
+        (sizeof(fs_volume_metadata<512, 512, 7813560247>) + sizeof(fs_root_directory<512, 512>)) / 512;
+    assert(cluster_heap_sector_offset_expected == cluster_heap_sector_offset_calculated);
     return 0;
 }
 

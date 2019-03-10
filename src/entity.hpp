@@ -42,13 +42,16 @@ namespace ExFATRestore {
 class BaseEntity
 {
 public:
-    BaseEntity(void *entry_start, int num_entries, std::shared_ptr<BaseEntity> parent, const std::string &name);
+    BaseEntity(void *entry_start, uint8_t num_entries, std::shared_ptr<BaseEntity> parent, const std::string &name);
     virtual ~BaseEntity() {}
 
     fs_entry *get_entity_start() const {
         return _fs_entries;
     }
-    int get_file_info_size() const {
+    uint8_t get_num_entries() const {
+        return _num_entries;
+    }
+    size_t get_file_info_size() const {
         return _num_entries * sizeof(struct fs_entry);
     }
     uint32_t get_start_cluster() const {
@@ -68,7 +71,7 @@ public:
     }
 protected:
     struct fs_entry *_fs_entries;
-    int _num_entries;
+    uint8_t _num_entries;
     std::shared_ptr<BaseEntity> _parent;
     std::string _name;
 };

@@ -44,6 +44,7 @@
 #include <locale>
 #include <codecvt>
 #include <list>
+#include <vector>
 
 #include "exception.hpp"
 #include "logger.hpp"
@@ -78,11 +79,18 @@ private:
     uint8_t *_partition_start;
     uint8_t *_partition_end;
 
-    fs_volume_metadata<SectorSize, SectorsPerCluster, NumSectors> _metadata; // not part of actual fs
+    // not part of actual partition, to be copied over later after being initialized
+    fs_volume_metadata<SectorSize, SectorsPerCluster, NumSectors> _metadata;
+    fs_root_directory<SectorSize, SectorsPerCluster> _root_directory;
+
+    // pointer to the start of the actual mmap()ed partition
     fs_filesystem<SectorSize, SectorsPerCluster, NumSectors> *_fs; // actual mmaped filesystem
+
     std::unordered_map<fs_entry*, std::shared_ptr<BaseEntity>> _offset_to_entity_mapping;
-    std::unique_ptr<RootDirectoryEntity> _root_directory_tpl;
+    std::unique_ptr<RootDirectoryEntity> _root_directory_entity;
     std::wstring_convert<std::codecvt_utf8_utf16<char16_t>, char16_t> _cvt;
+
+    std::vector<char16_t> _invalid_file_name_characters;
 };
 
 }
