@@ -69,6 +69,18 @@ struct fs_entry {
     uint8_t data[31];
 } __attribute__((packed));
 
+template <size_t SectorSize>
+struct fs_sector
+{
+    uint8_t data[SectorSize];
+} __attribute__((packed));
+
+template <size_t SectorSize, size_t SectorsPerCluster>
+struct fs_cluster
+{
+    fs_sector<SectorSize> sectors[SectorsPerCluster];
+} __attribute__((packed));
+
 enum fs_volume_flags_t {
     SECOND_FAT_ACTIVE   = 1<<0,
     VOLUME_DIRTY        = 1<<1,
@@ -98,7 +110,7 @@ struct fs_volume_boot_record {
     uint8_t  num_fats                   = 1;    // 1 or 2. 2 onlyfor TexFAT (not supported)
     uint8_t  drive_select;                      // Used by int 13
     uint8_t  percent_used;                      // Percentage of heap in use
-    uint8_t  reserved0                  = {0};
+    uint8_t  reserved[7]                = {0};
     uint8_t  boot_code[390]             = {0};
     uint16_t boot_signature             = 0xAA55;
     uint8_t  padding[SectorSize - 512] ;        // Padded out to sector size
@@ -295,27 +307,22 @@ struct fs_boot_region {
     fs_checksum_sector<SectorSize>           checksum;       // Sector 11
 } __attribute__((packed));
 
+enum fs_fat_entry_t {
+    BAD_CLUSTER                 = 0xFFFFFFF7,
+    MEDIA_DESCRIPTOR_HARD_DRIVE = 0xFFFFFFF8,
+    END_OF_FILE                 = 0xFFFFFFFF
+};
+
 template <size_t SectorSize, size_t SectorsPerCluster, size_t NumSectors>
 struct fs_file_allocation_table
 {
     static constexpr size_t NumClusters = NumSectors / SectorsPerCluster;
+    static constexpr size_t PaddingSize = SectorSize - (((2+NumClusters) * sizeof(uint32_t)) % SectorSize);
 
-    fs_file_allocation_table()
-    {
-        assert(sizeof(fs_file_allocation_table<SectorSize, SectorsPerCluster, NumClusters>) % SectorSize == 0);
-
-        media_type = 0xFFFFFFF8; // Hard drive
-        constant   = 0xFFFFFFFF; // Always 0xFFFFFFFF
-
-        for (size_t i = 0; i < sizeof(entries); ++i) {
-            entries[i] = i;
-        }
-        memset(padding, '\0', sizeof(padding));
-    }
-    uint32_t media_type;
-    uint32_t constant;
-    uint32_t entries[NumClusters];
-    uint8_t  padding[SectorSize - ((NumClusters * SectorsPerCluster * SectorSize) % SectorSize)];
+    uint32_t media_type             = MEDIA_DESCRIPTOR_HARD_DRIVE;
+    uint32_t reserved               = END_OF_FILE;   // Must be 0xFFFFFFFF
+    uint32_t entries[NumClusters]   = {END_OF_FILE}; // ??
+    uint8_t  padding[PaddingSize]   = {0}; // pad to sector
 } __attribute__((packed));
 
 template <size_t SectorSize, size_t SectorsPerCluster, size_t NumSectors>
@@ -341,50 +348,42 @@ template <size_t SectorSize, size_t SectorsPerCluster>
 struct fs_root_directory
 {
     static constexpr size_t ClusterSize = SectorSize * SectorsPerCluster;
-    static constexpr size_t NumDirectoryEntries = (ClusterSize - sizeof(fs_root_directory_metadata)) / sizeof(fs_entry);
 
     fs_root_directory_metadata metadata;
-    fs_entry directory_entries[NumDirectoryEntries];
-    uint8_t padding[ClusterSize - ((sizeof(fs_root_directory_metadata) + sizeof(fs_entry)*NumDirectoryEntries) % ClusterSize)]; // padded out to cluster???
-} __attribute__((packed));
-
-template <size_t SectorSize>
-struct fs_sector
-{
-    uint8_t data[SectorSize];
-} __attribute__((packed));
-
-template <size_t SectorSize, size_t SectorsPerCluster>
-struct fs_cluster
-{
-    fs_sector<SectorSize> sectors[SectorsPerCluster];
+    fs_entry directory_entries[0]; // dynamically sized based on number of child entities
 } __attribute__((packed));
 
 template <size_t SectorSize, size_t SectorsPerCluster, size_t NumSectors>
 struct fs_cluster_heap
 {
+    //TODO possibly need to subtract a cluster to account for the boot regions, TBD
     static constexpr size_t NumClusters = NumSectors / SectorsPerCluster;
 
     fs_cluster<SectorSize, SectorsPerCluster> storage[NumClusters];
 } __attribute__((packed));
 
 template <size_t SectorSize, size_t SectorsPerCluster, size_t NumSectors>
-struct fs_volume_metadata {
-    static constexpr size_t ClusterSize = SectorSize * SectorsPerCluster;
-
-    fs_boot_region<SectorSize>                                          main_boot_region;
-    fs_boot_region<SectorSize>                                          backup_boot_region; // copy of main_boot_region
+struct fs_fat_region {
+    //TODO figure out size of this alignment
+    //uint8_t fat_alignment[0];
     fs_file_allocation_table<SectorSize, SectorsPerCluster, NumSectors> fat;
+} __attribute__((packed));
 
-    //fs_cluster<SectorSize, SectorsPerCluster> reserved_cluster;
-    //uint8_t padding[ClusterSize - (2*sizeof(fs_boot_region<SectorSize>) + sizeof(fs_file_allocation_table<SectorSize, SectorsPerCluster, NumSectors>) + sizeof(fs_cluster<SectorSize, SectorsPerCluster>)) % ClusterSize]; // pad out to cluster???
+template <size_t SectorSize, size_t SectorsPerCluster, size_t NumSectors>
+struct fs_data_region {
+    //TODO figure out size of this alignment and excess space
+    //uint8_t cluster_heap_alignment[0];
+    fs_cluster_heap<SectorSize, SectorsPerCluster, NumSectors> cluster_heap;
+    //uint8_t excess_space[0];
 } __attribute__((packed));
 
 template <size_t SectorSize, size_t SectorsPerCluster, size_t NumSectors>
 struct fs_filesystem {
-    fs_volume_metadata<SectorSize, SectorsPerCluster, NumSectors>   metadata;
-    fs_root_directory<SectorSize, SectorsPerCluster>                root_directory;
-    fs_cluster_heap<SectorSize, SectorsPerCluster, NumSectors>      cluster_heap;
+    fs_boot_region<SectorSize>                                main_boot_region;
+    fs_boot_region<SectorSize>                                backup_boot_region; // copy of main_boot_region
+    fs_fat_region<SectorSize, SectorsPerCluster, NumSectors>  fat_region;
+    //root directory is in the cluster heap
+    fs_data_region<SectorSize, SectorsPerCluster, NumSectors> data_region;
 } __attribute__((packed));
 
 #endif /* _io_github_paulyc_exfat_structs_hpp_ */

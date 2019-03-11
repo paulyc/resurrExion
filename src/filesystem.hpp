@@ -67,6 +67,7 @@ public:
     std::shared_ptr<BaseEntity> loadEntity(uint8_t *entry_offset, std::shared_ptr<BaseEntity> parent);
 
     void init_metadata();
+    void write_metadata();
 
     void restore_all_files(const std::string &restore_dir_name, const std::string &textlogfilename);
 
@@ -80,7 +81,7 @@ private:
     uint8_t *_partition_end;
 
     // not part of actual partition, to be copied over later after being initialized
-    fs_volume_metadata<SectorSize, SectorsPerCluster, NumSectors> _metadata;
+    fs_boot_region<SectorSize> _boot_region;
     fs_root_directory<SectorSize, SectorsPerCluster> _root_directory;
 
     // pointer to the start of the actual mmap()ed partition

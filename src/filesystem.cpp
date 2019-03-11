@@ -78,13 +78,13 @@ ExFATFilesystem<SectorSize, SectorsPerCluster, NumSectors>::loadEntity(uint8_t *
     struct fs_file_name_entry *n = (struct fs_file_name_entry*)(entity_start+64);
 
     if (fde->type != FILE_DIR_ENTRY || streamext->type != STREAM_EXTENSION || n->type != FILE_NAME) {
-        logf(WARN, "bad number of continuations at offset %016xull\n", entity_start - _mmap);
+        logf(WARN, "bad number of continuations at offset %016llx\n", entity_start - _mmap);
         return nullptr;
     }
 
     const int continuations = fde->continuations;
     if (continuations < 2 || continuations > 18) {
-        logf(WARN, "bad number of continuations at offset %016xull\n", entity_start - _mmap);
+        logf(WARN, "bad number of continuations at offset %016llx\n", entity_start - _mmap);
         return nullptr;
     }
 
@@ -102,7 +102,7 @@ ExFATFilesystem<SectorSize, SectorsPerCluster, NumSectors>::loadEntity(uint8_t *
     }
 
     if (chksum != fde->checksum) {
-        logf(WARN, "bad file entry checksum at offset %016xull\n", entity_start - _mmap);
+        logf(WARN, "bad file entry checksum at offset %016llx\n", entity_start - _mmap);
         return nullptr;
     }
 
@@ -121,7 +121,7 @@ ExFATFilesystem<SectorSize, SectorsPerCluster, NumSectors>::loadEntity(uint8_t *
         }
     }
     if (u16s.length() != namelen) {
-        logf(WARN, "u16s.length() != namelen for entity at offset %016xull\n", entity_start - _mmap);
+        logf(WARN, "u16s.length() != namelen for entity at offset %016llx\n", entity_start - _mmap);
     }
     utf8_name = _cvt.to_bytes(u16s);
 
@@ -130,7 +130,7 @@ ExFATFilesystem<SectorSize, SectorsPerCluster, NumSectors>::loadEntity(uint8_t *
     //std::shared_ptr<BaseEntity> entity;
     // first see if we already loaded this entity
     std::unordered_map<fs_entry*, std::shared_ptr<BaseEntity>>::iterator entityit =
-        _offset_to_entity_mapping.find(entity_start);
+        _offset_to_entity_mapping.find((fs_entry*)entity_start);
     if (entityit != _offset_to_entity_mapping.end()) {
         if (entityit->second->get_parent() == nullptr) {
             if (parent != nullptr) {
@@ -138,7 +138,7 @@ ExFATFilesystem<SectorSize, SectorsPerCluster, NumSectors>::loadEntity(uint8_t *
             }
         } else {
             if (parent != nullptr) {
-                logf(WARN, "entity at offset %016xull already has a parent\n", entity_start - _mmap);
+                logf(WARN, "entity at offset %016llx already has a parent\n", entity_start - _mmap);
             }
         }
         return entityit->second;
@@ -180,35 +180,33 @@ void ExFATFilesystem<SectorSize, SectorsPerCluster, NumSectors>::init_metadata()
 {
     // pretty sure this is 0 because it's the first sector in the partition, not the whole disk
     // but i should verify
-    _metadata.main_boot_region.vbr.partition_offset_sectors = 0;
-    _metadata.main_boot_region.vbr.volume_length_sectors = NumSectors;
-    _metadata.main_boot_region.vbr.fat_offset_sectors =
+    _boot_region.vbr.partition_offset_sectors = 0;
+    _boot_region.vbr.volume_length_sectors = NumSectors;
+    _boot_region.vbr.fat_offset_sectors =
         2 * sizeof(fs_boot_region<SectorSize>) / SectorSize;
-    _metadata.main_boot_region.vbr.fat_length_sectors =
+    _boot_region.vbr.fat_length_sectors =
         sizeof(fs_file_allocation_table<SectorSize, SectorsPerCluster, NumSectors>) / SectorSize;
-    _metadata.main_boot_region.vbr.cluster_heap_offset_sectors =
-        (sizeof(fs_volume_metadata<SectorSize, SectorsPerCluster, NumSectors>) +
+    _boot_region.vbr.cluster_heap_offset_sectors =
+        (sizeof(fs_boot_region<SectorSize>) +
          sizeof(fs_root_directory<SectorSize, SectorsPerCluster>)) / SectorSize;
-    _metadata.main_boot_region.vbr.cluster_count = NumSectors / SectorsPerCluster;
-    _metadata.main_boot_region.vbr.root_directory_cluster = 0; // ??
+    _boot_region.vbr.cluster_count = NumSectors / SectorsPerCluster;
+    _boot_region.vbr.root_directory_cluster = 0; // ??
        // sizeof(fs_volume_metadata <SectorSize, SectorsPerCluster, NumSectors>) / (SectorSize * ClustersPerSector);// ???
-    _metadata.main_boot_region.vbr.volume_serial_number = 0; // ???
-    _metadata.main_boot_region.vbr.volume_flags = 0; // ??
+    _boot_region.vbr.volume_serial_number = 0; // ???
+    _boot_region.vbr.volume_flags = 0; // ??
 
     // calculate log base 2 of sector size and sectors per cluster
     size_t i = SectorSize;
-    _metadata.main_boot_region.vbr.bytes_per_sector = 0;
-    while (i >>= 1) { ++_metadata.main_boot_region.vbr.bytes_per_sector; }
+    _boot_region.vbr.bytes_per_sector = 0;
+    while (i >>= 1) { ++_boot_region.vbr.bytes_per_sector; }
 
-    _metadata.main_boot_region.vbr.sectors_per_cluster = 0;
+    _boot_region.vbr.sectors_per_cluster = 0;
     i = SectorsPerCluster;
-    while (i >>= 1) { ++_metadata.main_boot_region.vbr.sectors_per_cluster; }
+    while (i >>= 1) { ++_boot_region.vbr.sectors_per_cluster; }
 
-    _metadata.main_boot_region.vbr.drive_select = 0; // ??
-    _metadata.main_boot_region.vbr.percent_used = 100;
-    _metadata.main_boot_region.checksum.calculate_checksum((uint8_t*)&_metadata.main_boot_region.vbr, sizeof(_metadata.main_boot_region.vbr));
-
-    memcpy(&_metadata.backup_boot_region, &_metadata.main_boot_region, sizeof(fs_boot_region<SectorSize>));
+    _boot_region.vbr.drive_select = 0; // ??
+    _boot_region.vbr.percent_used = 100;
+    _boot_region.checksum.calculate_checksum((uint8_t*)&_boot_region.vbr, sizeof(_boot_region.vbr));
 
     std::basic_string<char16_t> volume_label_utf16 = _cvt.from_bytes("Elements");
     memcpy(_root_directory.metadata.label_entry.volume_label, volume_label_utf16.data(), sizeof(char16_t) * volume_label_utf16.length());
@@ -219,11 +217,18 @@ void ExFATFilesystem<SectorSize, SectorsPerCluster, NumSectors>::init_metadata()
         0x93, 0xda, 0x7d, 0x5c, 0xe9, 0xf1, 0xb9, 0x9d
     };
     memcpy(_root_directory.metadata.guid_entry.volume_guid, guid, sizeof(guid));
+}
+
+// copy metadata and root directory into fs mmap
+template <size_t SectorSize, size_t SectorsPerCluster, size_t NumSectors>
+void ExFATFilesystem<SectorSize, SectorsPerCluster, NumSectors>::write_metadata()
+{
+    memcpy(&_fs->main_boot_region, &_boot_region, sizeof(_boot_region));
+    memcpy(&_fs->backup_boot_region, &_boot_region, sizeof(_boot_region));
+
     // iterate over all entities, fill root directory with every entity not having a parent
     // mark every sector allocated in the FAT and allocation table to account for unknown
     // fragmented files
-
-    // copy metadata and root directory into fs mmap
 }
 
 template <size_t SectorSize, size_t SectorsPerCluster, size_t NumSectors>
@@ -237,7 +242,7 @@ void ExFATFilesystem<SectorSize, SectorsPerCluster, NumSectors>::restore_all_fil
             const std::string filename = std::get<std::string>(entry_info);
             std::shared_ptr<FileEntity> ent = std::dynamic_pointer_cast<FileEntity>(loadEntity(offset));
             if (!ent) {
-                logf(WARN, "Invalid file entry at offset %016xull\n", offset);
+                logf(WARN, "Invalid file entry at offset %016llx\n", offset);
                 return;
             }
             if (ent->is_contiguous()) {
@@ -245,7 +250,7 @@ void ExFATFilesystem<SectorSize, SectorsPerCluster, NumSectors>::restore_all_fil
                 const uint32_t start_cluster = ent->get_start_cluster();
                 const size_t file_offset = start_cluster * cluster_size_bytes + cluster_heap_disk_start_sector * sector_size_bytes;
                 const size_t file_size = ent->get_size();
-                logf(INFO, "recovering file %s at cluster offset %08xu disk offset %016xull size %d\n",
+                logf(INFO, "recovering file %s at cluster offset %08lx disk offset %016llx size %d\n",
                      filename, start_cluster, file_offset, file_size);
                 restored_file.write((const char *)(_mmap + file_offset), file_size);
                 restored_file.close();

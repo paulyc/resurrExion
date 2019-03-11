@@ -75,11 +75,11 @@ typedef ConsoleInterface DefaultLoggerInterface;
 #endif
 
 namespace {
-    std::future<LoggerInterface*> logger = std::async([]() -> LoggerInterface* { return new DefaultLoggerInterface; });
+    LoggerInterface *logger = new DefaultLoggerInterface;
 
     LoggerInterface * getLoggerInterface()
     {
-        return logger.get();
+        return logger;
     }
 }
 
