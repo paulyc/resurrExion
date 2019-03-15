@@ -46,6 +46,7 @@ int main(int argc, char *argv[])
 
 #include "../src/logger.hpp"
 #include "../src/filesystem.hpp"
+#include "../config/fsconfig.hpp"
 
 using namespace io::github::paulyc;
 
@@ -58,15 +59,19 @@ int main(int argc, char *argv[])
     l.logf(Loggable::INFO, "%08lx\n", 10);
 
     l.logf(Loggable::INFO, "sizeof(struct fs_boot_region) == %d\n", sizeof(struct fs_boot_region<512>));
-    assert(sizeof(struct fs_boot_region<512>) % 512 == 0);
-    l.logf(Loggable::INFO, "sizeof(struct fs_file_allocation_table) == %d\n", sizeof(struct fs_file_allocation_table<512, 512, 7813560247>));
-    assert(sizeof(struct fs_file_allocation_table<512, 512, 7813560247>) % 512 == 0);
+    assert(sizeof(struct fs_boot_region<SectorSize>) % SectorSize == 0);
+    l.logf(Loggable::INFO, "sizeof(struct fs_file_allocation_table) == %d\n", sizeof(struct fs_file_allocation_table<SectorSize, SectorsPerCluster, NumSectors>));
+    assert(sizeof(struct fs_file_allocation_table<SectorSize, SectorsPerCluster, NumSectors>) % 512 == 0);
 
-    // TODO figure this out....
-    //const size_t cluster_heap_sector_offset_expected = cluster_heap_partition_start_sector + partition_start_sector;
-    //const size_t cluster_heap_sector_offset_calculated =
-    //    (sizeof(fs_volume_metadata<512, 512, 7813560247>) + sizeof(fs_root_directory<512, 512>)) / 512 + partition_start_sector;
-    //assert(cluster_heap_sector_offset_expected == cluster_heap_sector_offset_calculated);
+    constexpr size_t fs_headers_size_bytes =
+        sizeof(fs_boot_region<SectorSize>) * 2 +
+        sizeof(fs_fat_region<SectorSize, SectorsPerCluster, ClustersInFat>);
+    assert((fs_headers_size_bytes % SectorSize) == 0);
+    constexpr size_t fs_headers_size_sectors = fs_headers_size_bytes / SectorSize;
+    l.logf(Loggable::INFO, "ClustersInFat == %08x\n", ClustersInFat);
+    l.logf(Loggable::INFO, "fs_headers_size_sectors == %08x\n", fs_headers_size_sectors);
+    assert(fs_headers_size_sectors == ClusterHeapStartSector);
+
     return 0;
 }
 

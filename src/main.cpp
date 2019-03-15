@@ -28,6 +28,7 @@
 #include <iostream>
 
 #include "filesystem.hpp"
+#include "../config/fsconfig.hpp"
 
 int main(int argc, const char * argv[]) {
 #if 1
@@ -37,7 +38,7 @@ int main(int argc, const char * argv[]) {
     }
 
     try {
-        io::github::paulyc::ExFATRestore::ExFATFilesystem<512, 512, 7813560247>  fs(argv[1], 4000000000000, 409640);
+        io::github::paulyc::ExFATRestore::ExFATFilesystem<SectorSize, SectorsPerCluster, NumSectors>  fs(argv[1], DiskSize, PartitionStartSector);
         fs.init_metadata();
     } catch (std::exception &ex) {
         std::cerr << "Exception " << typeid(ex).name() << " caught: " << ex.what() << std::endl;
@@ -52,7 +53,7 @@ int main(int argc, const char * argv[]) {
     }
 
     try {
-        io::github::paulyc::ExFATRestore::ExFATFilesystem<512, 512, 7813560247>  fs(argv[1], 4000000000000, 409640);
+        io::github::paulyc::ExFATRestore::ExFATFilesystem<SectorSize, 512, 7813560247>  fs(argv[1], 4000000000000, 409640);
         fs.restore_all_files(argv[3], argv[2]);
     } catch (std::exception &ex) {
         std::cerr << "Exception " << typeid(ex).name() << " caught: " << ex.what() << std::endl;

@@ -231,6 +231,8 @@ void ExFATFilesystem<SectorSize, SectorsPerCluster, NumSectors>::write_metadata(
     // fragmented files
 }
 
+constexpr static size_t ClusterHeapDiskStartSector = 0x8C400; // relative to partition start
+
 template <size_t SectorSize, size_t SectorsPerCluster, size_t NumSectors>
 void ExFATFilesystem<SectorSize, SectorsPerCluster, NumSectors>::restore_all_files(const std::string &restore_dir_name, const std::string &textlogfilename)
 {
@@ -248,7 +250,7 @@ void ExFATFilesystem<SectorSize, SectorsPerCluster, NumSectors>::restore_all_fil
             if (ent->is_contiguous()) {
                 std::ofstream restored_file(restore_dir_name + std::string("/") + filename, std::ios_base::binary);
                 const uint32_t start_cluster = ent->get_start_cluster();
-                const size_t file_offset = start_cluster * cluster_size_bytes + cluster_heap_disk_start_sector * sector_size_bytes;
+                const size_t file_offset = start_cluster * sizeof(fs_cluster<SectorSize, SectorsPerCluster>) + ClusterHeapDiskStartSector * SectorSize;
                 const size_t file_size = ent->get_size();
                 logf(INFO, "recovering file %s at cluster offset %08lx disk offset %016llx size %d\n",
                      filename, start_cluster, file_offset, file_size);

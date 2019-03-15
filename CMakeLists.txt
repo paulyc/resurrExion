@@ -12,6 +12,7 @@ include_directories(src)
 #find_library(FOUND_LOG4CPLUS log4cplus)
 
 set(NO_COMPILE_SOURCES
+	config/fsconfig.hpp
 	src/entity.hpp
 	src/exfat_structs.hpp
 	src/filesystem.hpp

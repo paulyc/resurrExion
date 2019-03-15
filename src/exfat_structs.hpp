@@ -96,7 +96,7 @@ struct fs_volume_boot_record {
     uint64_t partition_offset_sectors;          // Sector address of partition
     // (TODO is this the partition or the disk length? I think partition)
     uint64_t volume_length_sectors;             // Size of total volume in sectors
-    uint32_t fat_offset_sectors;                // Sector address of first FAT
+    uint32_t fat_offset_sectors;                // Sector address of first FAT (24?)
     uint32_t fat_length_sectors;                // Size of FAT in sectors
     uint32_t cluster_heap_offset_sectors;       // Sector offset of cluster heap
     uint32_t cluster_count;                     // Number of clusters in cluster heap
@@ -313,15 +313,15 @@ enum fs_fat_entry_t {
     END_OF_FILE                 = 0xFFFFFFFF
 };
 
-template <size_t SectorSize, size_t SectorsPerCluster, size_t NumSectors>
+template <size_t SectorSize, size_t SectorsPerCluster, size_t ClustersInFat>
 struct fs_file_allocation_table
 {
-    static constexpr size_t NumClusters = NumSectors / SectorsPerCluster;
-    static constexpr size_t PaddingSize = SectorSize - (((2+NumClusters) * sizeof(uint32_t)) % SectorSize);
+    static constexpr size_t FatSize = (ClustersInFat + 2) * sizeof(uint32_t);
+    static constexpr size_t PaddingSize = SectorSize - (FatSize % SectorSize);
 
     uint32_t media_type             = MEDIA_DESCRIPTOR_HARD_DRIVE;
     uint32_t reserved               = END_OF_FILE;   // Must be 0xFFFFFFFF
-    uint32_t entries[NumClusters]   = {END_OF_FILE}; // ??
+    uint32_t entries[ClustersInFat] = {END_OF_FILE}; // ??
     uint8_t  padding[PaddingSize]   = {0}; // pad to sector
 } __attribute__((packed));
 
@@ -329,9 +329,11 @@ template <size_t SectorSize, size_t SectorsPerCluster, size_t NumSectors>
 struct fs_allocation_bitmap_table
 {
     static constexpr size_t NumClusters = NumSectors / SectorsPerCluster;
+    static constexpr size_t BitmapSize = (NumClusters / 8) + ((NumClusters % 8) == 0 ? 0 : 1);
+    static constexpr size_t PaddingSize = SectorSize - (BitmapSize % SectorSize);
 
-    uint8_t bitmap[(NumClusters / 8) + ((NumClusters % 8) == 0 ? 0 : 1)];
-    uint8_t padding[SectorSize - (sizeof(bitmap) % SectorSize)];
+    uint8_t bitmap[BitmapSize];
+    uint8_t padding[PaddingSize];
 } __attribute__((packed));
 
 struct fs_root_directory_metadata {
@@ -353,37 +355,40 @@ struct fs_root_directory
     fs_entry directory_entries[0]; // dynamically sized based on number of child entities
 } __attribute__((packed));
 
-template <size_t SectorSize, size_t SectorsPerCluster, size_t NumSectors>
+template <size_t SectorSize, size_t SectorsPerCluster, size_t ClustersInFat>
 struct fs_cluster_heap
 {
-    //TODO possibly need to subtract a cluster to account for the boot regions, TBD
-    static constexpr size_t NumClusters = NumSectors / SectorsPerCluster;
-
-    fs_cluster<SectorSize, SectorsPerCluster> storage[NumClusters];
+    fs_cluster<SectorSize, SectorsPerCluster> storage[ClustersInFat];
 } __attribute__((packed));
 
-template <size_t SectorSize, size_t SectorsPerCluster, size_t NumSectors>
+template <size_t SectorSize, size_t SectorsPerCluster, size_t ClustersInFat>
 struct fs_fat_region {
-    //TODO figure out size of this alignment
-    //uint8_t fat_alignment[0];
-    fs_file_allocation_table<SectorSize, SectorsPerCluster, NumSectors> fat;
+    constexpr static size_t cluster_heap_start_sector = 0x283D8;
+    constexpr static size_t fat_heap_alignment_sectors = cluster_heap_start_sector -
+        (2 * sizeof(fs_boot_region<SectorSize>) + // 24 sectors = 12288 bytes
+        sizeof(fs_file_allocation_table<SectorSize, SectorsPerCluster, ClustersInFat>)) / SectorSize;
+
+    fs_file_allocation_table<SectorSize, SectorsPerCluster, ClustersInFat> fat;
+    fs_sector<SectorSize> fat_cluster_heap_alignment[fat_heap_alignment_sectors];
 } __attribute__((packed));
 
-template <size_t SectorSize, size_t SectorsPerCluster, size_t NumSectors>
+template <size_t SectorSize, size_t SectorsPerCluster, size_t NumSectors, size_t ClustersInFat>
 struct fs_data_region {
-    //TODO figure out size of this alignment and excess space
-    //uint8_t cluster_heap_alignment[0];
-    fs_cluster_heap<SectorSize, SectorsPerCluster, NumSectors> cluster_heap;
-    //uint8_t excess_space[0];
+    constexpr static size_t ExcessSectors = NumSectors - ClustersInFat * SectorsPerCluster;
+
+    fs_cluster_heap<SectorSize, SectorsPerCluster, ClustersInFat> cluster_heap;
+    fs_sector<SectorSize> excess_space[ExcessSectors];
 } __attribute__((packed));
 
 template <size_t SectorSize, size_t SectorsPerCluster, size_t NumSectors>
 struct fs_filesystem {
-    fs_boot_region<SectorSize>                                main_boot_region;
-    fs_boot_region<SectorSize>                                backup_boot_region; // copy of main_boot_region
-    fs_fat_region<SectorSize, SectorsPerCluster, NumSectors>  fat_region;
+    constexpr static size_t ClustersInFat = (NumSectors - 0x283D8) / 512;
+    fs_boot_region<SectorSize>                                                  main_boot_region;
+    // copy of main_boot_region
+    fs_boot_region<SectorSize>                                                  backup_boot_region;
+    fs_fat_region<SectorSize, SectorsPerCluster, ClustersInFat>                 fat_region;
     //root directory is in the cluster heap
-    fs_data_region<SectorSize, SectorsPerCluster, NumSectors> data_region;
+    fs_data_region<SectorSize, SectorsPerCluster, NumSectors, ClustersInFat>    data_region;
 } __attribute__((packed));
 
 #endif /* _io_github_paulyc_exfat_structs_hpp_ */
