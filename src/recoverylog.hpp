@@ -159,7 +159,7 @@ class RecoveryLogTextWriter : public RecoveryLogWriter<Filesystem_T>
 public:
     RecoveryLogTextWriter(const std::string &filename) : RecoveryLogWriter<Filesystem_T>(filename), _logfile(filename, std::ios::trunc) {}
 
-    void writeTextLog(const std::string &devfilename, const std::string &logfilename);
+    //void writeTextLog(const std::string &devfilename, const std::string &logfilename);
 private:
     std::ofstream _logfile;
 };

@@ -29,12 +29,6 @@
 #define _io_github_paulyc_filesystem_hpp_
 
 #include <stdint.h>
-#include <stddef.h>
-#include <assert.h>
-#include <sys/mman.h>
-#include <sys/stat.h>
-#include <fcntl.h>
-#include <unistd.h>
 
 #include <variant>
 #include <memory>
@@ -61,27 +55,34 @@ template <size_t SectorSize, size_t SectorsPerCluster, size_t NumSectors>
 class ExFATFilesystem : public Loggable
 {
 public:
-    ExFATFilesystem(const char *devname, size_t devsize, size_t partition_first_sector);
+    ExFATFilesystem(const char *devname, size_t devsize, size_t partition_first_sector, bool write_changes);
     virtual ~ExFATFilesystem();
 
     std::shared_ptr<BaseEntity> loadEntity(uint8_t *entry_offset, std::shared_ptr<BaseEntity> parent);
+    void loadDirectory(std::shared_ptr<DirectoryEntity> de);
 
     void init_metadata();
     void write_metadata();
+
+    void load_directory_tree(const std::string &textlogfilename);
 
     void restore_all_files(const std::string &restore_dir_name, const std::string &textlogfilename);
 
     void textLogToBinLog(const std::string &textlogfilename, const std::string &binlogfilename);
 
 private:
-    int _fd;
+    static constexpr size_t ClustersInFat = (NumSectors - 0x283D8) / 512;
+
+    int      _fd;
     uint8_t *_mmap;
-    size_t _devsize;
+    size_t   _devsize;
+    bool     _write_changes;
     uint8_t *_partition_start;
     uint8_t *_partition_end;
 
     // not part of actual partition, to be copied over later after being initialized
     fs_boot_region<SectorSize> _boot_region;
+    fs_file_allocation_table<SectorSize, SectorsPerCluster, ClustersInFat> _fat;
     fs_root_directory<SectorSize, SectorsPerCluster> _root_directory;
 
     // pointer to the start of the actual mmap()ed partition

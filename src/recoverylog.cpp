@@ -25,6 +25,8 @@
 //  SOFTWARE.
 //
 
+#include "recoverylog.hpp"
+
 #include <stdio.h>
 #include <string.h>
 
@@ -35,6 +37,7 @@
 #include <iomanip>
 #include <regex>
 
+#if 0
 using namespace io::github::paulyc::ExFATRestore;
 
 template <typename Filesystem_T>
@@ -42,7 +45,7 @@ void RecoveryLogTextWriter<Filesystem_T>::writeTextLog(
     const std::string &devfilename,
     const std::string &logfilename)
 {
-#if 0
+
     std::ifstream dev(devfilename, std::ios::binary);
     std::ofstream log(logfilename, std::ios::app);
 
@@ -136,5 +139,5 @@ void RecoveryLogTextWriter<Filesystem_T>::writeTextLog(
         }
     }
     log.close();
-#endif
 }
+#endif

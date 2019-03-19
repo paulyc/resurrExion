@@ -38,7 +38,7 @@ int main(int argc, const char * argv[]) {
     }
 
     try {
-        io::github::paulyc::ExFATRestore::ExFATFilesystem<SectorSize, SectorsPerCluster, NumSectors>  fs(argv[1], DiskSize, PartitionStartSector);
+        io::github::paulyc::ExFATRestore::ExFATFilesystem<SectorSize, SectorsPerCluster, NumSectors>  fs(argv[1], DiskSize, PartitionStartSector, false);
         fs.init_metadata();
     } catch (std::exception &ex) {
         std::cerr << "Exception " << typeid(ex).name() << " caught: " << ex.what() << std::endl;

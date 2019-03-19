@@ -25,7 +25,15 @@
 //  SOFTWARE.
 //
 
+#include "filesystem.hpp"
 #include "recoverylog.hpp"
+
+#include <stddef.h>
+#include <assert.h>
+#include <sys/mman.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <unistd.h>
 
 namespace io {
 namespace github {
@@ -33,23 +41,28 @@ namespace paulyc {
 namespace ExFATRestore {
 
 template <size_t SectorSize, size_t SectorsPerCluster, size_t NumSectors>
-ExFATFilesystem<SectorSize, SectorsPerCluster, NumSectors>::ExFATFilesystem(const char *devname, size_t devsize, size_t partition_first_sector) :
+ExFATFilesystem<SectorSize, SectorsPerCluster, NumSectors>::ExFATFilesystem(const char *devname, size_t devsize, size_t partition_first_sector, bool write_changes) :
     _fd(-1),
     _mmap((uint8_t*)MAP_FAILED),
-    _devsize(devsize)
+    _devsize(devsize),
+    _write_changes(write_changes)
 {
-    _fd = open(devname, O_RDONLY);
+    const int oflags = write_changes ? O_RDWR | O_DSYNC | O_RSYNC : O_RDONLY;
+    _fd = open(devname, oflags);
     if (_fd == -1) {
         throw posix_exception(errno);
     }
 
-    _mmap = (uint8_t*)mmap(0, _devsize, PROT_READ, MAP_PRIVATE, _fd, 0);
+    const int mprot = write_changes ? PROT_READ | PROT_WRITE : PROT_READ;
+    const int mflags = write_changes ? MAP_SHARED : MAP_PRIVATE;
+    _mmap = (uint8_t*)mmap(0, _devsize, mprot, mflags, _fd, 0);
     if (_mmap == (uint8_t*)MAP_FAILED) {
         throw posix_exception(errno);
     }
 
     _partition_start = _mmap + partition_first_sector * SectorSize;
     _partition_end = _partition_start + (NumSectors + 1) * SectorSize;
+    _fs = (fs_filesystem<SectorSize, SectorsPerCluster, NumSectors>*)_partition_start;
 
     _invalid_file_name_characters = {'"', '*', '/', ':', '<', '>', '?', '\\', '|'};
     for (char16_t ch = 0; ch <= 0x001F; ++ch) {
@@ -66,6 +79,27 @@ ExFATFilesystem<SectorSize, SectorsPerCluster, NumSectors>::~ExFATFilesystem()
 
     if (_fd != -1) {
         close(_fd);
+    }
+}
+
+template <size_t SectorSize, size_t SectorsPerCluster, size_t NumSectors>
+void
+ExFATFilesystem<SectorSize, SectorsPerCluster, NumSectors>::loadDirectory(std::shared_ptr<DirectoryEntity> de)
+{
+    const uint32_t start_cluster = de->get_start_cluster();
+    fs_entry *dirent;
+    if (start_cluster == 0) {
+        // directory children immediately follow
+        dirent = de->get_entity_start() + de->get_num_entries();
+    } else {
+        dirent = (fs_entry*)_fs->cluster_heap.storage[start_cluster].sectors[0].data;
+    }
+
+    const uint8_t num_secondary_entries = ((fs_primary_directory_entry*)dirent)->secondary_count;
+    for (uint8_t secondary_entry = 0; secondary_entry < num_secondary_entries; ++secondary_entry) {
+        std::shared_ptr<BaseEntity> child = this->loadEntity((uint8_t*)dirent, de);
+        de->add_child(child);
+        dirent += child->get_num_entries();
     }
 }
 
@@ -148,24 +182,7 @@ ExFATFilesystem<SectorSize, SectorsPerCluster, NumSectors>::loadEntity(uint8_t *
         std::shared_ptr<DirectoryEntity> de =
             std::make_shared<DirectoryEntity>(entity_start, continuations + 1, parent, utf8_name);
         _offset_to_entity_mapping[de->get_entity_start()] = de;
-        const uint32_t start_cluster = de->get_start_cluster();
-        fs_entry *dirent;
-        if (start_cluster == 0) {
-            // directory children immediately follow
-            dirent = de->get_entity_start() + de->get_num_entries();
-        } else {
-            dirent = (fs_entry*)_fs->cluster_heap.storage[start_cluster].sectors[0].data;
-        }
-
-        const uint8_t num_secondary_entries = ((fs_primary_directory_entry*)dirent)->secondary_count;
-        for (uint8_t secondary_entry = 0; secondary_entry < num_secondary_entries; ++secondary_entry) {
-            //std::shared_ptr<BaseEntity> child = loadEntity(child_entry, de);
-        }
-
-        // Not tail recursive but I'm gonna go head and assume that ExFAT sets a limit on some number of
-        // directory levels before we run out of memory, at least until I'm not half-cocked and in a hurry and
-        // can figure out a more reasonable solution
-
+        this->loadDirectory(de);
         return de;
     } else {
         std::shared_ptr<FileEntity> fe =
@@ -217,6 +234,12 @@ void ExFATFilesystem<SectorSize, SectorsPerCluster, NumSectors>::init_metadata()
         0x93, 0xda, 0x7d, 0x5c, 0xe9, 0xf1, 0xb9, 0x9d
     };
     memcpy(_root_directory.metadata.guid_entry.volume_guid, guid, sizeof(guid));
+
+
+    // create upcase table
+
+    // create allocation bitmap
+
 }
 
 // copy metadata and root directory into fs mmap
@@ -229,6 +252,40 @@ void ExFATFilesystem<SectorSize, SectorsPerCluster, NumSectors>::write_metadata(
     // iterate over all entities, fill root directory with every entity not having a parent
     // mark every sector allocated in the FAT and allocation table to account for unknown
     // fragmented files
+}
+
+template <size_t SectorSize, size_t SectorsPerCluster, size_t NumSectors>
+void ExFATFilesystem<SectorSize, SectorsPerCluster, NumSectors>::load_directory_tree(const std::string &textlogfilename)
+{
+    // load everything in the log, and put anything without a parent into the root directory
+    RecoveryLogTextReader<ExFATFilesystem<SectorSize, SectorsPerCluster, NumSectors>> reader(textlogfilename);
+
+    reader.parseTextLog(*this, [this](size_t offset, std::variant<std::string, std::exception, bool> entry_info) {
+        if (std::holds_alternative<std::string>(entry_info)) {
+            // File entry
+            const std::string filename = std::get<std::string>(entry_info);
+            std::shared_ptr<FileEntity> ent = std::dynamic_pointer_cast<FileEntity>(loadEntity(offset));
+            if (!ent) {
+                logf(WARN, "Invalid file entry at offset %016llx\n", offset);
+                return;
+            }
+        } else if (std::holds_alternative<bool>(entry_info)) {
+            // Bad sector, mark it in the fat
+            _fat.entries[offset] = BAD_CLUSTER;
+        } else {
+            // Exception
+            std::exception &ex = std::get<std::exception>(entry_info);
+            logf(WARN, "entry_info had exception type %s with message %s\n", typeid(ex).name(), ex.what());
+        }
+    });
+
+    // find everything without a parent
+    for (const auto & [ entry_ptr, entity ] : _offset_to_entity_mapping) {
+        if (entity->get_parent() == nullptr) {
+            entity->set_parent(_root_directory);
+            _root_directory->add_child(entity);
+        }
+    }
 }
 
 constexpr static size_t ClusterHeapDiskStartSector = 0x8C400; // relative to partition start

@@ -11,12 +11,21 @@ include_directories(src)
 
 #find_library(FOUND_LOG4CPLUS log4cplus)
 
+set(COMPILE_SOURCES
+	src/entity.cpp
+	src/exception.cpp
+	src/journal.cpp
+	src/logger.cpp
+	src/main.cpp
+)
+
 set(NO_COMPILE_SOURCES
 	config/fsconfig.hpp
 	src/entity.hpp
 	src/exfat_structs.hpp
 	src/filesystem.hpp
 	src/filesystem.cpp
+	src/journal.hpp
 	src/logger.hpp
 	src/recoverylog.hpp
 	src/recoverylog.cpp
@@ -25,10 +34,7 @@ set(NO_COMPILE_SOURCES
 add_executable(
 	ExFATRestore
 
-	src/entity.cpp
-	src/exception.cpp
-	src/logger.cpp
-	src/main.cpp
+	${COMPILE_SOURCES}
 	${NO_COMPILE_SOURCES}
 )
 
@@ -44,13 +50,15 @@ endif()
 set(TEST_COMPILE_SOURCES
 	src/logger.cpp
 	test/logger.cpp
+	test/journal.cpp
 	test/main.cpp
 	test/filesystem.cpp
 )
 
 set(TEST_NO_COMPILE_SOURCES
-	test/logger.hpp
 	test/filesystem.hpp
+	test/journal.hpp
+	test/logger.hpp
 )
 
 add_executable(
