@@ -51,32 +51,19 @@ namespace io {
 namespace github {
 namespace paulyc {
 
-class posix_exception : public std::exception {
+class posix_exception : public std::runtime_error {
 public:
-    posix_exception(int errno_) : _errno(errno_) {}
+    posix_exception(int errno_) : std::runtime_error(strerror(errno_)), _errno(errno_) {}
     virtual ~posix_exception() {}
-
-    virtual const char *what() const noexcept { return strerror(_errno); }
 private:
     int _errno;
 };
 
-class string_exception : public std::exception {
-public:
-    string_exception(const std::string &msg) : _msg(msg) {}
-    virtual ~string_exception() {}
-
-    virtual const char* what() const noexcept { return _msg.c_str(); }
-private:
-    std::string _msg;
-};
-
 namespace ExFATRestore {
 
-class restore_error : public string_exception {
+class restore_error : public std::runtime_error {
 public:
-    restore_error(const std::string &msg) : string_exception(msg) {}
-    virtual ~restore_error() {}
+    explicit restore_error(const std::string &msg) : std::runtime_error(msg) {}
 };
 
 }
