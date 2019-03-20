@@ -26,9 +26,28 @@
 //
 
 #include <iostream>
+#include <string>
 
 #include "filesystem.hpp"
 #include "../config/fsconfig.hpp"
+
+struct Options
+{
+    std::string deviceFileName;
+    std::string binaryLogFileName;
+    std::string textLogFileName;
+    bool write_changes = false;
+    bool reconstruct = false;
+    bool analyze = false;
+    bool write_text_log = false;
+    bool write_binary_log = false;
+    bool read_text_log = false;
+    bool read_binary_log = false;
+    size_t sector_size = 512;
+    size_t sectors_per_cluster = 512;
+    size_t num_sectors;
+    size_t cluster_heap_offset;
+};
 
 int main(int argc, const char * argv[]) {
 #if 1

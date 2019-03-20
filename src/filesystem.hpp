@@ -88,6 +88,8 @@ private:
     // not part of actual partition, to be copied over later after being initialized
     fs_boot_region<SectorSize> _boot_region;
     fs_file_allocation_table<SectorSize, SectorsPerCluster, ClustersInFat> _fat;
+    fs_allocation_bitmap_table<SectorSize, SectorsPerCluster, ClustersInFat> _allocation_bitmap;
+    fs_upcase_table<SectorSize, 256> _upcase_table;
     fs_root_directory<SectorSize, SectorsPerCluster> _root_directory;
 
     // pointer to the start of the actual mmap()ed partition

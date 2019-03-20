@@ -242,9 +242,27 @@ void ExFATFilesystem<SectorSize, SectorsPerCluster, NumSectors>::init_metadata()
 
 
     // create upcase table
+    for (i = 0; i < 0x61; ++i) {
+        _upcase_table.entries[i] = i;
+    }
+    for (; i <= 0x7B; ++i) {
+        // a-z => A=>z (0x61-0x7a => 0x41-0x5a, clear 0x20 bit)
+        _upcase_table.entries[i] = i ^ 0x20; // US-ASCII letters
+    }
+    for (; i < 0xE0; ++i) {
+        _upcase_table.entries[i] = i;
+    }
+    for (; i < 0xFF; ++i) {
+        if (i == 0xD7 || i == 0xF7) { // multiplication and division signs
+            _upcase_table.entries[i] = i;
+        } else {
+            _upcase_table.entries[i] = i ^ 0x20; // ISO-8859-1 letters with diacritics
+        }
+    }
 
-    // create allocation bitmap
-
+    // create allocation bitmap, just set every cluster allocated so we don't overwrite anything
+    // after mounting the filesystem
+    memset(_allocation_bitmap.bitmap, 0xFF, sizeof(_allocation_bitmap.bitmap));
 }
 
 // copy metadata and root directory into fs mmap

@@ -245,6 +245,17 @@ struct fs_allocation_bitmap_entry {
     uint64_t data_length;   // Size of allocation bitmap in bytes. Ceil(ClusterCount / 8)
 } __attribute__((packed));
 
+template <size_t SectorSize, size_t SectorsPerCluster, size_t NumSectors>
+struct fs_allocation_bitmap_table
+{
+    static constexpr size_t NumClusters = NumSectors / SectorsPerCluster;
+    static constexpr size_t BitmapSize = (NumClusters / 8) + ((NumClusters % 8) == 0 ? 0 : 1);
+    static constexpr size_t PaddingSize = SectorSize - (BitmapSize % SectorSize);
+
+    uint8_t bitmap[BitmapSize];
+    uint8_t padding[PaddingSize];
+} __attribute__((packed));
+
 enum fs_volume_guid_flags {
     ALLOCATION_POSSIBLE = 1<<0, // must be 0
     NO_FAT_CHAIN        = 1<<1  // must be 0
@@ -273,6 +284,11 @@ struct fs_upcase_table_entry {
     uint8_t  reserved1[12]  = {0};
     uint32_t first_cluster;
     uint64_t data_length;
+} __attribute__((packed));
+
+template <int SectorSize, int NumEntries>
+struct fs_upcase_table {
+    char16_t entries[NumEntries];
 } __attribute__((packed));
 
 template <size_t SectorSize>
@@ -323,17 +339,6 @@ struct fs_file_allocation_table
     uint32_t reserved               = END_OF_FILE;   // Must be 0xFFFFFFFF
     uint32_t entries[ClustersInFat] = {END_OF_FILE}; // ??
     uint8_t  padding[PaddingSize]   = {0}; // pad to sector
-} __attribute__((packed));
-
-template <size_t SectorSize, size_t SectorsPerCluster, size_t NumSectors>
-struct fs_allocation_bitmap_table
-{
-    static constexpr size_t NumClusters = NumSectors / SectorsPerCluster;
-    static constexpr size_t BitmapSize = (NumClusters / 8) + ((NumClusters % 8) == 0 ? 0 : 1);
-    static constexpr size_t PaddingSize = SectorSize - (BitmapSize % SectorSize);
-
-    uint8_t bitmap[BitmapSize];
-    uint8_t padding[PaddingSize];
 } __attribute__((packed));
 
 struct fs_root_directory_metadata {

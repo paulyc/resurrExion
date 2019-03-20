@@ -27,6 +27,9 @@
 
 #include "journal.hpp"
 
+#include <functional>
+#include <algorithm>
+#include <memory>
 #include <string.h>
 
 namespace io {
@@ -50,10 +53,10 @@ void TransactionJournal::add_write(size_t ofs_write, size_t ofs_read, size_t byt
 void TransactionJournal::commit()
 {
     for (std::deque<std::unique_ptr<Diff>>::iterator diffit = _changeset.begin();
-         diffit != _changeset.cend();
+         diffit != _changeset.end();
          ++diffit)
     {
-        diffit->get()->apply();
+        (*diffit)->apply();
     }
 }
 
@@ -63,7 +66,7 @@ void TransactionJournal::rollback()
          diffit != _changeset.rend();
          ++diffit)
     {
-        diffit->get()->unapply();
+        (*diffit)->unapply();
     }
 }
 
