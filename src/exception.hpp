@@ -50,15 +50,19 @@ inline void assertBreakpoint(bool test, std::string msg)
 }
 
 #define _io_github_paulyc_STRINGIFY(x) #x
+#define _io_github_paulyc_STRING(l) _io_github_paulyc_STRINGIFY(l)
+#define _io_github_paulyc_FILELINE __FILE__ ":" _io_github_paulyc_STRING(__LINE__)
 
 #ifdef _DEBUG
 
 #define ASSERT_BP(test, msg) io::github::paulyc::assertBreakpoint((test), (msg))
 
-#define ASSERT_THROW(assertion) do { \
+#define ASSERT_THROW(assertion) \
+do { \
 if ((bool)(assertion) == false) { \
-throw std::runtime_error( _io_github_paulyc_STRINGIFY(assertion) ); \
-}} while (0);
+throw std::runtime_error(\
+"[" _io_github_paulyc_FILELINE  "] Assertion failed: " _io_github_paulyc_STRINGIFY(assertion) \
+);}} while (0);
 
 #else /* _DEBUG */
 

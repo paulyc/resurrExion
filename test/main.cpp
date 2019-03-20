@@ -69,7 +69,7 @@ bool test_assert_failure()
     } catch (const std::exception &ex) {
         std::cerr << "ASSERT_THROW(2+2 == 5) threw: " << ex.what() << std::endl;
 
-        if (std::string(ex.what()) != std::string("2+2 == 5")) {
+        if (std::string(ex.what()).find("2+2 == 5") == std::string::npos) {
             return false;
         }
     }
