@@ -35,6 +35,10 @@
 #include <fcntl.h>
 #include <unistd.h>
 
+#ifndef O_RSYNC
+#define O_RSYNC O_SYNC
+#endif
+
 namespace io {
 namespace github {
 namespace paulyc {

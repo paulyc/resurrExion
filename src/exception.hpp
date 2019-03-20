@@ -55,6 +55,8 @@ class posix_exception : public std::runtime_error {
 public:
     posix_exception(int errno_) : std::runtime_error(strerror(errno_)), _errno(errno_) {}
     virtual ~posix_exception() {}
+
+    int get_errno() const { return _errno; }
 private:
     int _errno;
 };

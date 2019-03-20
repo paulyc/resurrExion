@@ -24,3 +24,46 @@
 //  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 //  SOFTWARE.
 //
+
+#ifndef _io_github_paulyc_journal_hpp_test_
+#define _io_github_paulyc_journal_hpp_test_
+
+#include <cppunit/extensions/HelperMacros.h>
+
+#include "../src/logger.hpp"
+#include "../src/journal.hpp"
+
+using namespace io::github::paulyc;
+
+class JournalTest : public CppUnit::TestFixture,
+                    public Loggable
+{
+    CPPUNIT_TEST_SUITE(JournalTest);
+    CPPUNIT_TEST(testAddDiff);
+    CPPUNIT_TEST(testCommit);
+    CPPUNIT_TEST(testRollback);
+    CPPUNIT_TEST_SUITE_END();
+
+    TransactionJournal _journal;
+    uint8_t _test_buffer[1024] = {0};
+
+public:
+    JournalTest() : _journal(_test_buffer) {}
+
+    void setUp() { logf(INFO, "JournalTest::setUp()\n"); }
+    void tearDown() { logf(INFO, "JournalTest::tearDown()\n"); }
+
+    void testAddDiff() {
+        logf(INFO, "JournalTest::testAddDiff\n");
+    }
+
+    void testCommit() {
+        logf(INFO, "JournalTest::testCommit\n");
+    }
+
+    void testRollback() {
+        logf(INFO, "JournalTest::testRollback\n");
+    }
+};
+
+#endif /* _io_github_paulyc_journal_hpp_test_ */

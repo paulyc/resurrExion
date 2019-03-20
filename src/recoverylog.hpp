@@ -116,7 +116,6 @@ public:
                     cb(0, std::variant<std::string, std::exception, bool>(ex));
                 }
             } else if (std::regex_match(line, sm, badsector)) {
-                int32_t bad_sector_flag;
                 size_t offset;
                 try {
                     offset = std::stol(sm[1], nullptr, 16);
