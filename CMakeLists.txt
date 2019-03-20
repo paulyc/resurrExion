@@ -23,43 +23,50 @@ endif(USE_LOG4CPLUS)
 
 include_directories(src)
 
-set(COMPILE_SOURCES
+set(LIB_COMPILE_SOURCES
     config/fsconfig.hpp
     src/entity.cpp
     src/entity.hpp
     src/exfat_structs.hpp
     src/exception.cpp
+    src/exception.hpp
     src/filesystem.hpp
     src/journal.cpp
     src/journal.hpp
     src/logger.cpp
     src/logger.hpp
-    src/main.cpp
     src/recoverylog.hpp
 )
 
-set(NO_COMPILE_SOURCES
+set(LIB_NO_COMPILE_SOURCES
 	src/filesystem.cpp
 	src/recoverylog.cpp
 )
 
-add_executable(
-	ExFATRestore
+add_library(
+    ExFATRestore
 
-	${COMPILE_SOURCES}
-	${NO_COMPILE_SOURCES}
+    SHARED
+
+    ${LIB_COMPILE_SOURCES}
+    ${LIB_NO_COMPILE_SOURCES}
 )
 
-set_source_files_properties(${NO_COMPILE_SOURCES} PROPERTIES HEADER_FILE_ONLY TRUE)
+set_source_files_properties(${LIB_NO_COMPILE_SOURCES} PROPERTIES HEADER_FILE_ONLY TRUE)
 target_link_libraries(ExFATRestore pthread)
 
 if(LOG4CPLUS_FOUND)
-    target_link_libraries(ExFATRestore ${LOG4CPLUS_LIBRARY})
+    target_link_libraries(ExFATRestore log4cplus)
 endif(LOG4CPLUS_FOUND)
 
+add_executable(
+	restore
+	src/main.cpp
+)
+
+target_link_libraries(restore ExFATRestore)
+
 set(TEST_COMPILE_SOURCES
-    src/journal.cpp
-	src/logger.cpp
 	test/filesystem.hpp
 	test/filesystem.cpp
 	test/journal.hpp
@@ -73,19 +80,15 @@ set(TEST_NO_COMPILE_SOURCES
 )
 
 add_executable(
-	ExFATRestoreTest
+	test
 
 	${TEST_COMPILE_SOURCES}
 	${TEST_NO_COMPILE_SOURCES}
 )
 
 set_source_files_properties(${TEST_NO_COMPILE_SOURCES} PROPERTIES HEADER_FILE_ONLY TRUE)
-target_link_libraries(ExFATRestoreTest pthread)
+target_link_libraries(test ExFATRestore)
 
 if(CPPUNIT_FOUND)
-    target_link_libraries(ExFATRestoreTest cppunit)
+    target_link_libraries(test cppunit)
 endif(CPPUNIT_FOUND)
-
-if(LOG4CPLUS_FOUND)
-    target_link_libraries(ExFATRestore log4cplus)
-endif(LOG4CPLUS_FOUND)

@@ -55,6 +55,11 @@ template <size_t SectorSize, size_t SectorsPerCluster, size_t NumSectors>
 class ExFATFilesystem : public Loggable
 {
 public:
+    class restore_error : public std::runtime_error {
+    public:
+        explicit restore_error(const std::string &msg) : std::runtime_error(msg) {}
+    };
+
     ExFATFilesystem(const char *devname, size_t devsize, size_t partition_first_sector, bool write_changes);
     virtual ~ExFATFilesystem();
 

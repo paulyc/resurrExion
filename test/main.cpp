@@ -25,24 +25,13 @@
 //  SOFTWARE.
 //
 
-#include <iostream>
-
-#if USE_CPPUNIT
-
-#include <cppunit/ui/text/TestRunner.h>
-#include <cppunit/extensions/TestFactoryRegistry.h>
-#include <system_error>
-
-int main(int argc, char *argv[])
-{
-    CppUnit::TextUi::TestRunner runner;
-    CppUnit::TestFactoryRegistry &registry = CppUnit::TestFactoryRegistry::getRegistry();
-    runner.addTest(registry.makeTest());
-    bool wasSuccessful = runner.run("", false);
-    return !wasSuccessful;
-}
-
+#ifdef _DEBUG
+#include "../src/exception.hpp"
 #else
+#define _DEBUG 1
+#include "../src/exception.hpp"
+#undef _DEBUG
+#endif
 
 #include "../src/logger.hpp"
 #include "../src/filesystem.hpp"
@@ -50,29 +39,82 @@ int main(int argc, char *argv[])
 
 using namespace io::github::paulyc;
 
-int main(int argc, char *argv[])
+#if USE_CPPUNIT
+
+#include <cppunit/ui/text/TestRunner.h>
+#include <cppunit/extensions/TestFactoryRegistry.h>
+
+bool test_cppunit()
+{
+    CppUnit::TextUi::TestRunner runner;
+    CppUnit::TestFactoryRegistry &registry = CppUnit::TestFactoryRegistry::getRegistry();
+    runner.addTest(registry.makeTest());
+    return runner.run("", false);
+}
+
+#else /* USE_CPPUNIT */
+
+bool test_cppunit()
+{
+    std::cerr << "WARNING: Didn't run the CppUnit tests as USE_CPPUNIT is not defined" << std::endl;
+    return true;
+}
+
+#endif /* USE_CPPUNIT */
+
+bool test_assert_failure()
+{
+    try {
+        ASSERT_THROW(2+2 == 5);
+    } catch (const std::exception &ex) {
+        std::cerr << "ASSERT_THROW(2+2 == 5) threw: " << ex.what() << std::endl;
+
+        if (std::string(ex.what()) != std::string("2+2 == 5")) {
+            return false;
+        }
+    }
+    return true;
+}
+
+bool test_logger()
 {
     Loggable l;
-    l.logf(Loggable::INFO, "No tests run, #define USE_CPPUNIT\n");
-    //std::cerr << "No tests run, #define USE_CPPUNIT" << std::endl;
     l.logf(Loggable::INFO, "%016llx\n", 10);
     l.logf(Loggable::INFO, "%08lx\n", 10);
 
     l.logf(Loggable::INFO, "sizeof(struct fs_boot_region) == %d\n", sizeof(struct fs_boot_region<512>));
-    assert(sizeof(struct fs_boot_region<SectorSize>) % SectorSize == 0);
+    ASSERT_THROW(sizeof(struct fs_boot_region<SectorSize>) % SectorSize == 0);
     l.logf(Loggable::INFO, "sizeof(struct fs_file_allocation_table) == %d\n", sizeof(struct fs_file_allocation_table<SectorSize, SectorsPerCluster, NumSectors>));
-    assert(sizeof(struct fs_file_allocation_table<SectorSize, SectorsPerCluster, NumSectors>) % 512 == 0);
+    ASSERT_THROW(sizeof(struct fs_file_allocation_table<SectorSize, SectorsPerCluster, NumSectors>) % 512 == 0);
 
     constexpr size_t fs_headers_size_bytes =
-        sizeof(fs_boot_region<SectorSize>) * 2 +
-        sizeof(fs_fat_region<SectorSize, SectorsPerCluster, ClustersInFat>);
-    assert((fs_headers_size_bytes % SectorSize) == 0);
+    sizeof(fs_boot_region<SectorSize>) * 2 +
+    sizeof(fs_fat_region<SectorSize, SectorsPerCluster, ClustersInFat>);
+    ASSERT_THROW((fs_headers_size_bytes % SectorSize) == 0);
     constexpr size_t fs_headers_size_sectors = fs_headers_size_bytes / SectorSize;
     l.logf(Loggable::INFO, "ClustersInFat == %08x\n", ClustersInFat);
     l.logf(Loggable::INFO, "fs_headers_size_sectors == %08x\n", fs_headers_size_sectors);
-    assert(fs_headers_size_sectors == ClusterHeapStartSector);
-
-    return 0;
+    ASSERT_THROW(fs_headers_size_sectors == ClusterHeapStartSector);
+    return true;
 }
 
-#endif
+int main(int argc, char *argv[])
+{
+    bool success = true;
+    try {
+        success &= test_assert_failure();
+        success &= test_logger();
+        success &= test_cppunit();
+    } catch (const std::exception &ex) {
+        success = false;
+        std::cerr << "Test threw exception " << ex.what() << std::endl;
+    }
+
+    if (success) {
+        std::cerr << "Tests passed." << std::endl;
+        return 0;
+    } else {
+        std::cerr << "Tests failed." << std::endl;
+        return 1;
+    }
+}

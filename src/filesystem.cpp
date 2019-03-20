@@ -25,6 +25,7 @@
 //  SOFTWARE.
 //
 
+#include "exception.hpp"
 #include "filesystem.hpp"
 #include "recoverylog.hpp"
 
@@ -54,14 +55,14 @@ ExFATFilesystem<SectorSize, SectorsPerCluster, NumSectors>::ExFATFilesystem(cons
     const int oflags = write_changes ? O_RDWR | O_DSYNC | O_RSYNC : O_RDONLY;
     _fd = open(devname, oflags);
     if (_fd == -1) {
-        throw posix_exception(errno);
+        throw std::system_error(std::error_code(errno, std::system_category()));
     }
 
     const int mprot = write_changes ? PROT_READ | PROT_WRITE : PROT_READ;
     const int mflags = write_changes ? MAP_SHARED : MAP_PRIVATE;
     _mmap = (uint8_t*)mmap(0, _devsize, mprot, mflags, _fd, 0);
     if (_mmap == (uint8_t*)MAP_FAILED) {
-        throw posix_exception(errno);
+        throw std::system_error(std::error_code(errno, std::system_category()));
     }
 
     _partition_start = _mmap + partition_first_sector * SectorSize;

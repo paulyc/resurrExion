@@ -29,11 +29,15 @@
 #define _io_github_paulyc_exception_hpp_
 
 #include <string>
-#include <exception>
 #include <iostream>
-#include <string.h>
+#include <exception>
+#include <system_error>
 
-inline void bpAssert(bool test, std::string msg)
+namespace io {
+namespace github {
+namespace paulyc {
+
+inline void assertBreakpoint(bool test, std::string msg)
 {
     if (!test) {
         std::cerr << "Breakpoint assertion failed: " << msg << std::endl;
@@ -41,37 +45,26 @@ inline void bpAssert(bool test, std::string msg)
     }
 }
 
+}
+}
+}
+
+#define _io_github_paulyc_STRINGIFY(x) #x
+
 #ifdef _DEBUG
-#define BP_ASSERT(test, msg) bpAssert((test), (msg))
-#else
-#define BP_ASSERT(test, msg)
-#endif
 
-namespace io {
-namespace github {
-namespace paulyc {
+#define ASSERT_BP(test, msg) io::github::paulyc::assertBreakpoint((test), (msg))
 
-class posix_exception : public std::runtime_error {
-public:
-    posix_exception(int errno_) : std::runtime_error(strerror(errno_)), _errno(errno_) {}
-    virtual ~posix_exception() {}
+#define ASSERT_THROW(assertion) do { \
+if ((bool)(assertion) == false) { \
+throw std::runtime_error( _io_github_paulyc_STRINGIFY(assertion) ); \
+}} while (0);
 
-    int get_errno() const { return _errno; }
-private:
-    int _errno;
-};
+#else /* _DEBUG */
 
-namespace ExFATRestore {
+#define ASSERT_BP(test, msg)
+#define ASSERT_THROW(assertion)
 
-class restore_error : public std::runtime_error {
-public:
-    explicit restore_error(const std::string &msg) : std::runtime_error(msg) {}
-};
-
-}
-
-}
-}
-}
+#endif /* _DEBUG */
 
 #endif /* _io_github_paulyc_exception_hpp_ */
