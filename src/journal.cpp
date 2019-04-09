@@ -36,8 +36,9 @@ namespace io {
 namespace github {
 namespace paulyc {
 
-TransactionJournal::TransactionJournal(uint8_t *base_ptr) :
-    _base_ptr(base_ptr)
+TransactionJournal::TransactionJournal(uint8_t *base_ptr, const char *journal_filename) :
+    _base_ptr(base_ptr),
+    _journal_file(journal_filename, std::ios_base::in | std::ios_base::out | std::ios_base::binary)
 {
 }
 

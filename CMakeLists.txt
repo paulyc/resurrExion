@@ -59,12 +59,12 @@ if(LOG4CPLUS_FOUND)
     target_link_libraries(ExFATRestore log4cplus)
 endif(LOG4CPLUS_FOUND)
 
-add_executable(
-	restore
-	src/main.cpp
-)
-
-target_link_libraries(restore ExFATRestore)
+find_package(Boost 1.58.0 COMPONENTS program_options)
+if(Boost_FOUND)
+    include_directories(${Boost_INCLUDE_DIRS})
+    add_executable(restore src/main.cpp)
+    target_link_libraries(restore ExFATRestore ${Boost_LIBRARIES})
+endif()
 
 set(TEST_COMPILE_SOURCES
 	test/filesystem.hpp

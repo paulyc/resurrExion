@@ -32,6 +32,9 @@
 #include <stdint.h>
 #include <string.h>
 
+#include <string>
+#include <algorithm>
+
 enum fs_entry_flags_t {
     VALID       = 0x80,
     CONTINUED   = 0x40,
@@ -108,7 +111,7 @@ struct fs_volume_boot_record {
     uint8_t  sectors_per_cluster;               // Power of two
     // Cluster size must be in range 512-4096 so bytes_per_sector + sectors_per_cluster <= 25
     uint8_t  num_fats                   = 1;    // 1 or 2. 2 onlyfor TexFAT (not supported)
-    uint8_t  drive_select;                      // Used by int 13
+    uint8_t  drive_select               = 0x80; // Extended INT 13h drive number
     uint8_t  percent_used;                      // Percentage of heap in use
     uint8_t  reserved[7]                = {0};
     uint8_t  boot_code[390]             = {0};
@@ -239,7 +242,7 @@ struct fs_file_name_entry {
 
 struct fs_allocation_bitmap_entry {
     uint8_t type            = ALLOCATION_BITMAP;
-    uint8_t bitmap_flags;   // 0 if first allocation bitmap, 1 if second (TexFAT only)
+    uint8_t bitmap_flags    = 0; // 0 if first allocation bitmap, 1 if second (TexFAT only)
     uint8_t reserved[18]    = {0};
     uint32_t first_cluster; // First data cluster number
     uint64_t data_length;   // Size of allocation bitmap in bytes. Ceil(ClusterCount / 8)
@@ -271,6 +274,14 @@ struct fs_volume_guid_entry {
 } __attribute__((packed));
 
 struct fs_volume_label_entry {
+    fs_volume_label_entry() {}
+    fs_volume_label_entry(std::basic_string<char16_t> volume_label_utf16) { set_label(volume_label_utf16); }
+
+    void set_label(std::basic_string<char16_t> volume_label_utf16) {
+        character_count = std::min(sizeof(volume_label), volume_label_utf16.length());
+        memcpy(volume_label, volume_label_utf16.data(), sizeof(char16_t) * character_count);
+    }
+
     uint8_t type                = VOLUME_LABEL; // 0x83 if volume label exists or 0x03 if it was deleted
     uint8_t character_count     = 0;            // characters in label
     uint16_t volume_label[11]   = {0};

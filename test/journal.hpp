@@ -48,7 +48,7 @@ class JournalTest : public CppUnit::TestFixture,
     uint8_t _test_buffer[1024] = {0};
 
 public:
-    JournalTest() : _journal(_test_buffer) {}
+    JournalTest() : _journal(_test_buffer, "") {}
 
     void setUp() { logf(INFO, "JournalTest::setUp()\n"); }
     void tearDown() { logf(INFO, "JournalTest::tearDown()\n"); }

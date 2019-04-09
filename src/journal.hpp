@@ -32,6 +32,7 @@
 #include <memory>
 #include <string>
 #include <exception>
+#include <fstream>
 
 namespace io {
 namespace github {
@@ -40,7 +41,7 @@ namespace paulyc {
 class TransactionJournal
 {
 public:
-    TransactionJournal(uint8_t *base_ptr);
+    TransactionJournal(uint8_t *base_ptr, const char *journal_filename);
     virtual ~TransactionJournal();
 
     void add_write(size_t ofs_write, size_t ofs_read, size_t byte_count);
@@ -74,6 +75,7 @@ private:
 
     uint8_t *const _base_ptr;
     std::deque<std::unique_ptr<Diff>> _changeset;
+    std::fstream _journal_file;
 };
 
 } /* namespace paulyc */

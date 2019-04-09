@@ -200,6 +200,7 @@ ExFATFilesystem<SectorSize, SectorsPerCluster, NumSectors>::loadEntity(uint8_t *
 template <size_t SectorSize, size_t SectorsPerCluster, size_t NumSectors>
 void ExFATFilesystem<SectorSize, SectorsPerCluster, NumSectors>::init_metadata()
 {
+    constexpr size_t cluster_count = NumSectors / SectorsPerCluster;
     // pretty sure this is 0 because it's the first sector in the partition, not the whole disk
     // but i should verify
     _boot_region.vbr.partition_offset_sectors = 0;
@@ -211,11 +212,11 @@ void ExFATFilesystem<SectorSize, SectorsPerCluster, NumSectors>::init_metadata()
     _boot_region.vbr.cluster_heap_offset_sectors =
         (sizeof(fs_boot_region<SectorSize>) +
          sizeof(fs_root_directory<SectorSize, SectorsPerCluster>)) / SectorSize;
-    _boot_region.vbr.cluster_count = NumSectors / SectorsPerCluster;
-    _boot_region.vbr.root_directory_cluster = 0; // ??
+    _boot_region.vbr.cluster_count = cluster_count;
+    //TODO _boot_region.vbr.root_directory_cluster = 0;
        // sizeof(fs_volume_metadata <SectorSize, SectorsPerCluster, NumSectors>) / (SectorSize * ClustersPerSector);// ???
-    _boot_region.vbr.volume_serial_number = 0; // ???
-    _boot_region.vbr.volume_flags = 0; // ??
+    _boot_region.vbr.volume_serial_number = 0xDEADBEEF;
+    _boot_region.vbr.volume_flags = VOLUME_DIRTY;
 
     // calculate log base 2 of sector size and sectors per cluster
     size_t i = SectorSize;
@@ -230,17 +231,16 @@ void ExFATFilesystem<SectorSize, SectorsPerCluster, NumSectors>::init_metadata()
     _boot_region.vbr.percent_used = 100;
     _boot_region.checksum.calculate_checksum((uint8_t*)&_boot_region.vbr, sizeof(_boot_region.vbr));
 
-    std::basic_string<char16_t> volume_label_utf16 = _cvt.from_bytes("Elements");
-    memcpy(_root_directory.metadata.label_entry.volume_label, volume_label_utf16.data(), sizeof(char16_t) * volume_label_utf16.length());
-    _root_directory.metadata.label_entry.character_count = volume_label_utf16.length(); // dont count null
-    // some random number I made up
-    const uint8_t guid[] = {
-        0x16, 0x06, 0x7e, 0xa1, 0x85, 0x3d, 0xf9, 0x25,
-        0x93, 0xda, 0x7d, 0x5c, 0xe9, 0xf1, 0xb9, 0x9d
-    };
-    memcpy(_root_directory.metadata.guid_entry.volume_guid, guid, sizeof(guid));
+    _root_directory.metadata.label_entry.set_label(_cvt.from_bytes("Elements"));
 
+    // fs_allocation_bitmap_entry  bitmap_entry;
+    // create allocation bitmap, just set every cluster allocated so we don't overwrite anything
+    // after mounting the filesystem
+    memset(_allocation_bitmap.bitmap, 0xFF, sizeof(_allocation_bitmap.bitmap));
+    _root_directory.metadata.bitmap_entry.data_length = sizeof(_allocation_bitmap.bitmap);
+    //TBD _root_directory.metadata.bitmap_entry.first_cluster;
 
+    // fs_upcase_table_entry       upcase_entry;
     // create upcase table
     for (i = 0; i < 0x61; ++i) {
         _upcase_table.entries[i] = i;
@@ -259,10 +259,23 @@ void ExFATFilesystem<SectorSize, SectorsPerCluster, NumSectors>::init_metadata()
             _upcase_table.entries[i] = i ^ 0x20; // ISO-8859-1 letters with diacritics
         }
     }
+    //TODO _root_directory.metadata.upcase_entry.checksum;
+    //TODO _root_directory.metadata.upcase_entry.first_cluster;
+    //TODO _root_directory.metadata.upcase_entry.data_length;
 
-    // create allocation bitmap, just set every cluster allocated so we don't overwrite anything
-    // after mounting the filesystem
-    memset(_allocation_bitmap.bitmap, 0xFF, sizeof(_allocation_bitmap.bitmap));
+//    fs_volume_guid_entry        guid_entry;
+    // some random number I made up
+    const uint8_t guid[] = {
+        0x16, 0x06, 0x7e, 0xa1, 0x85, 0x3d, 0xf9, 0x25,
+        0x93, 0xda, 0x7d, 0x5c, 0xe9, 0xf1, 0xb9, 0x9d
+    };
+    memcpy(_root_directory.metadata.guid_entry.volume_guid, guid, sizeof(guid));
+    //TODO_root_directory.metadata.guid_entry.set_checksum;
+//    fs_file_directory_entry     directory_entry;
+//    fs_stream_extension_entry   ext_entry;
+//    fs_file_name_entry          name_entry;
+
+
 }
 
 // copy metadata and root directory into fs mmap
@@ -271,6 +284,10 @@ void ExFATFilesystem<SectorSize, SectorsPerCluster, NumSectors>::write_metadata(
 {
     memcpy(&_fs->main_boot_region, &_boot_region, sizeof(_boot_region));
     memcpy(&_fs->backup_boot_region, &_boot_region, sizeof(_boot_region));
+
+    memcpy(&_fs->fat_region, &_fat, sizeof(_fat));
+
+    memcpy(&_fs->data_region, &_root_directory);
 
     // iterate over all entities, fill root directory with every entity not having a parent
     // mark every sector allocated in the FAT and allocation table to account for unknown
