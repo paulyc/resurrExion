@@ -227,41 +227,23 @@ void ExFATFilesystem<SectorSize, SectorsPerCluster, NumSectors>::init_metadata()
     i = SectorsPerCluster;
     while (i >>= 1) { ++_boot_region.vbr.sectors_per_cluster; }
 
-    _boot_region.vbr.drive_select = 0; // ??
     _boot_region.vbr.percent_used = 100;
     _boot_region.checksum.calculate_checksum((uint8_t*)&_boot_region.vbr, sizeof(_boot_region.vbr));
 
-    _root_directory.metadata.label_entry.set_label(_cvt.from_bytes("Elements"));
+    _root_directory.label_entry.set_label(_cvt.from_bytes("Elements"));
 
     // fs_allocation_bitmap_entry  bitmap_entry;
     // create allocation bitmap, just set every cluster allocated so we don't overwrite anything
     // after mounting the filesystem
     memset(_allocation_bitmap.bitmap, 0xFF, sizeof(_allocation_bitmap.bitmap));
-    _root_directory.metadata.bitmap_entry.data_length = sizeof(_allocation_bitmap.bitmap);
-    //TBD _root_directory.metadata.bitmap_entry.first_cluster;
+    _root_directory.bitmap_entry.data_length = sizeof(_allocation_bitmap.bitmap);
+    //TBD _root_directory.bitmap_entry.first_cluster;
 
     // fs_upcase_table_entry       upcase_entry;
-    // create upcase table
-    for (i = 0; i < 0x61; ++i) {
-        _upcase_table.entries[i] = i;
-    }
-    for (; i <= 0x7B; ++i) {
-        // a-z => A=>z (0x61-0x7a => 0x41-0x5a, clear 0x20 bit)
-        _upcase_table.entries[i] = i ^ 0x20; // US-ASCII letters
-    }
-    for (; i < 0xE0; ++i) {
-        _upcase_table.entries[i] = i;
-    }
-    for (; i < 0xFF; ++i) {
-        if (i == 0xD7 || i == 0xF7) { // multiplication and division signs
-            _upcase_table.entries[i] = i;
-        } else {
-            _upcase_table.entries[i] = i ^ 0x20; // ISO-8859-1 letters with diacritics
-        }
-    }
-    //TODO _root_directory.metadata.upcase_entry.checksum;
-    //TODO _root_directory.metadata.upcase_entry.first_cluster;
-    //TODO _root_directory.metadata.upcase_entry.data_length;
+    _root_directory.upcase_entry.calc_checksum((const uint8_t*)&_upcase_table, sizeof(_upcase_table));
+
+    _root_directory.upcase_entry.data_length = sizeof(_upcase_table);
+    //TODO _root_directory.upcase_entry.first_cluster;
 
 //    fs_volume_guid_entry        guid_entry;
     // some random number I made up
@@ -269,13 +251,11 @@ void ExFATFilesystem<SectorSize, SectorsPerCluster, NumSectors>::init_metadata()
         0x16, 0x06, 0x7e, 0xa1, 0x85, 0x3d, 0xf9, 0x25,
         0x93, 0xda, 0x7d, 0x5c, 0xe9, 0xf1, 0xb9, 0x9d
     };
-    memcpy(_root_directory.metadata.guid_entry.volume_guid, guid, sizeof(guid));
-    //TODO_root_directory.metadata.guid_entry.set_checksum;
+    memcpy(_root_directory.guid_entry.volume_guid, guid, sizeof(guid));
+    //TODO_root_directory.guid_entry.set_checksum;
 //    fs_file_directory_entry     directory_entry;
 //    fs_stream_extension_entry   ext_entry;
 //    fs_file_name_entry          name_entry;
-
-
 }
 
 // copy metadata and root directory into fs mmap

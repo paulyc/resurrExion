@@ -289,6 +289,12 @@ struct fs_volume_label_entry {
 } __attribute__((packed));
 
 struct fs_upcase_table_entry {
+    void calc_checksum(const uint8_t *data, size_t bytes) {
+        checksum = 0;
+        for (size_t i = 0; i < bytes; i++) {
+            checksum = (checksum << 31) | (checksum >> 1) + data[i];
+        }
+    }
     uint8_t  type           = UPCASE_TABLE; // 0x82
     uint8_t  reserved0[3]   = {0};
     uint32_t checksum;
@@ -299,6 +305,26 @@ struct fs_upcase_table_entry {
 
 template <int SectorSize, int NumEntries>
 struct fs_upcase_table {
+    fs_upcase_table() {
+        unsigned i;
+        for (i = 0; i < 0x61; ++i) {
+            entries[i] = i;
+        }
+        for (; i <= 0x7B; ++i) {
+            // a-z => A=>z (0x61-0x7a => 0x41-0x5a, clear 0x20 bit)
+            entries[i] = i ^ 0x20; // US-ASCII letters
+        }
+        for (; i < 0xE0; ++i) {
+            entries[i] = i;
+        }
+        for (; i < 0xFF; ++i) {
+            if (i == 0xD7 || i == 0xF7) { // multiplication and division signs
+                entries[i] = i;
+            } else {
+                entries[i] = i ^ 0x20; // ISO-8859-1 letters with diacritics
+            }
+        }
+    }
     char16_t entries[NumEntries];
 } __attribute__((packed));
 
@@ -352,23 +378,41 @@ struct fs_file_allocation_table
     uint8_t  padding[PaddingSize]   = {0}; // pad to sector
 } __attribute__((packed));
 
-struct fs_root_directory_metadata {
-    fs_volume_label_entry       label_entry;
-    fs_allocation_bitmap_entry  bitmap_entry;
-    fs_upcase_table_entry       upcase_entry;
-    fs_volume_guid_entry        guid_entry;
-    fs_file_directory_entry     directory_entry;
-    fs_stream_extension_entry   ext_entry;
-    fs_file_name_entry          name_entry;
-} __attribute__((packed));
-
 template <size_t SectorSize, size_t SectorsPerCluster>
 struct fs_root_directory
 {
     static constexpr size_t ClusterSize = SectorSize * SectorsPerCluster;
 
-    fs_root_directory_metadata metadata;
-    fs_entry directory_entries[0]; // dynamically sized based on number of child entities
+    fs_volume_label_entry        label_entry;
+    fs_allocation_bitmap_entry   bitmap_entry;
+    fs_upcase_table_entry        upcase_entry;
+    fs_volume_guid_entry         guid_entry;
+    fs_file_directory_entry      directory_entry;
+    fs_stream_extension_entry    ext_entry;
+    fs_file_name_entry           name_entry;
+    fs_secondary_directory_entry directory_entries[0]; // dynamically sized based on number of child entities
+} __attribute__((packed));
+
+struct fs_directory
+{
+    void calc_entry_set_checksum(uint8_t secondary_count) {
+        primary_entry.secondary_count = secondary_count;
+        uint16_t &chksum = primary_entry.set_checksum = 0;
+        const uint8_t *data = (const uint8_t*)&primary_entry;
+        for (int i = 0; i < sizeof(struct fs_primary_directory_entry); ++i) {
+            if (i != 2 && i != 3) {
+                chksum = ((chksum << 31) | (chksum >> 1)) + data[i];
+            }
+        }
+        for (size_t sec_entry = 0; sec_entry < secondary_count; ++sec_entry) {
+            data = (const uint8_t*)(secondary_entries + sec_entry);
+            for (int i = 0; i < sizeof(struct fs_secondary_directory_entry); ++i) {
+                chksum = ((chksum << 31) | (chksum >> 1)) + data[i];
+            }
+        }
+    }
+    struct fs_primary_directory_entry primary_entry;
+    struct fs_secondary_directory_entry secondary_entries[0];
 } __attribute__((packed));
 
 template <size_t SectorSize, size_t SectorsPerCluster, size_t ClustersInFat>
