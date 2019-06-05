@@ -28,7 +28,7 @@
 #define BOOST_TEST_DYN_LINK
 #include <boost/test/unit_test.hpp>
 
-#include "../src/logger.hpp"
+#include "logger.hpp"
 using io::github::paulyc::Loggable;
 
 BOOST_AUTO_TEST_SUITE(LoggerTestSuite)
@@ -38,6 +38,7 @@ BOOST_AUTO_TEST_CASE(TestLogger)
 	Loggable l;
 	l.logf(Loggable::INFO, "%016llx\n", 10);
 	l.logf(Loggable::INFO, "%08lx\n", 10);
+	l.logf(Loggable::INFO, "Testing logger %s\n", "something else");
 }
 
 BOOST_AUTO_TEST_SUITE_END()

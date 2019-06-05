@@ -28,30 +28,15 @@
 #ifndef _io_github_paulyc_journal_hpp_test_
 #define _io_github_paulyc_journal_hpp_test_
 
-#include <cppunit/extensions/HelperMacros.h>
-
 #include "../src/logger.hpp"
 #include "../src/journal.hpp"
 
-using namespace io::github::paulyc;
-
-class JournalTest : public CppUnit::TestFixture,
-                    public Loggable
+class JournalTest : public io::github::paulyc::Loggable
 {
-    CPPUNIT_TEST_SUITE(JournalTest);
-    CPPUNIT_TEST(testAddDiff);
-    CPPUNIT_TEST(testCommit);
-    CPPUNIT_TEST(testRollback);
-    CPPUNIT_TEST_SUITE_END();
-
-    TransactionJournal _journal;
+	io::github::paulyc::TransactionJournal _journal;
     uint8_t _test_buffer[1024] = {0};
-
 public:
     JournalTest() : _journal(_test_buffer, "") {}
-
-    void setUp() { logf(INFO, "JournalTest::setUp()\n"); }
-    void tearDown() { logf(INFO, "JournalTest::tearDown()\n"); }
 
     void testAddDiff() {
         logf(INFO, "JournalTest::testAddDiff\n");

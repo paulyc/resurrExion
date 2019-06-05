@@ -28,23 +28,6 @@
 #ifndef _io_github_paulyc_logger_hpp_test_
 #define _io_github_paulyc_logger_hpp_test_
 
-#include <cppunit/extensions/HelperMacros.h>
-
 #include "../src/logger.hpp"
-
-class LoggerTest : public CppUnit::TestFixture, public io::github::paulyc::Loggable
-{
-    CPPUNIT_TEST_SUITE(LoggerTest);
-    CPPUNIT_TEST(testLog);
-    CPPUNIT_TEST_SUITE_END();
-
-public:
-    void setUp() {}
-    void tearDown() {}
-
-    void testLog() {
-        this->logf(INFO, "Testing logger %s\n", "something else");
-    }
-};
 
 #endif /* _io_github_paulyc_logger_hpp_test_ */

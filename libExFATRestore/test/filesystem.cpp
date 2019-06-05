@@ -37,8 +37,6 @@ BOOST_AUTO_TEST_SUITE(FilesystemTestSuite)
 BOOST_AUTO_TEST_CASE(TestStructs)
 {
 	Loggable l;
-	l.logf(Loggable::INFO, "%016llx\n", 10);
-	l.logf(Loggable::INFO, "%08lx\n", 10);
 
 	l.logf(Loggable::INFO, "sizeof(struct fs_boot_region) == %d\n", sizeof(struct fs_boot_region<512>));
 	BOOST_STATIC_ASSERT(sizeof(struct fs_boot_region<SectorSize>) % SectorSize == 0);

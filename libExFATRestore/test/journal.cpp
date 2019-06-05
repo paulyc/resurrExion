@@ -28,4 +28,25 @@
 #define BOOST_TEST_DYN_LINK
 #include <boost/test/unit_test.hpp>
 
-#include "../src/journal.hpp"
+#include "journal.hpp"
+
+static JournalTest test;
+
+BOOST_AUTO_TEST_SUITE(JournalTestSuite)
+
+BOOST_AUTO_TEST_CASE(TestAddDiff)
+{
+	test.testAddDiff();
+}
+
+BOOST_AUTO_TEST_CASE(TestCommit)
+{
+	test.testCommit();
+}
+
+BOOST_AUTO_TEST_CASE(TestRollback)
+{
+	test.testRollback();
+}
+
+BOOST_AUTO_TEST_SUITE_END()
