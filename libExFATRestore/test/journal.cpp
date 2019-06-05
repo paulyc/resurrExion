@@ -1,8 +1,8 @@
 //
-//  logger.cpp - Console/file/syslog logging interface tests
+//  journal.cpp - Write journal tests
 //  ExFATRestore
 //
-//  Created by Paul Ciarlo on 5 March 2019.
+//  Created by Paul Ciarlo on 19 March 2019.
 //
 //  Copyright (C) 2019 Paul Ciarlo <paul.ciarlo@gmail.com>.
 //
@@ -25,10 +25,7 @@
 //  SOFTWARE.
 //
 
-#if USE_CPPUNIT
+#define BOOST_TEST_DYN_LINK
+#include <boost/test/unit_test.hpp>
 
-#include "logger.hpp"
-
-CPPUNIT_TEST_SUITE_REGISTRATION(LoggerTest);
-
-#endif /* USE_CPPUNIT */
+#include "../src/journal.hpp"

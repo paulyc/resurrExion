@@ -22,21 +22,37 @@
 # SOFTWARE.
 #
 
-cmake_minimum_required(VERSION 3.10.3)
+set(LIB_HEADERS
+	../config/fsconfig.hpp
+	entity.hpp
+	exfat_structs.hpp
+	exception.hpp
+	filesystem.hpp
+	journal.hpp
+	logger.hpp
+	recoverylog.hpp
+)
 
-project(ExFATRestore)
+set(LIB_COMPILE_SOURCES
+	entity.cpp
+	exception.cpp
+	journal.cpp
+	logger.cpp
+)
 
-# https://cmake.org/cmake/help/latest/prop_tgt/CXX_STANDARD.html
-set(CMAKE_CXX_STANDARD 17)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_CXX_EXTENSIONS OFF)
-set(CMAKE_C_STANDARD 11)
+set(LIB_NO_COMPILE_SOURCES
+	filesystem.cpp
+	recoverylog.cpp
+)
 
-#set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=c11")
-#set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++17")
+add_library(
+	ExFATRestore
+	SHARED
+	${LIB_HEADERS}
+	${LIB_COMPILE_SOURCES}
+	${LIB_NO_COMPILE_SOURCES}
+)
 
-find_package(Boost 1.58.0 REQUIRED system date_time unit_test_framework program_options)
-
-add_subdirectory(libExFATRestore)
-add_subdirectory(restore)
-
+set_source_files_properties(${LIB_NO_COMPILE_SOURCES} PROPERTIES HEADER_FILE_ONLY TRUE)
+target_include_directories(ExFATRestore PUBLIC ../config)
+target_link_libraries(ExFATRestore pthread)

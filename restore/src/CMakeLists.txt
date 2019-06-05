@@ -22,21 +22,6 @@
 # SOFTWARE.
 #
 
-cmake_minimum_required(VERSION 3.10.3)
-
-project(ExFATRestore)
-
-# https://cmake.org/cmake/help/latest/prop_tgt/CXX_STANDARD.html
-set(CMAKE_CXX_STANDARD 17)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_CXX_EXTENSIONS OFF)
-set(CMAKE_C_STANDARD 11)
-
-#set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=c11")
-#set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++17")
-
-find_package(Boost 1.58.0 REQUIRED system date_time unit_test_framework program_options)
-
-add_subdirectory(libExFATRestore)
-add_subdirectory(restore)
-
+add_executable(restore main.cpp)
+target_include_directories(restore PUBLIC ${Boost_INCLUDE_DIRS} ../../libExFATRestore/src)
+target_link_libraries(restore ExFATRestore ${Boost_LIBRARIES})

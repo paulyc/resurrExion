@@ -1,5 +1,5 @@
 //
-//  filesystem.cpp - Filesystem tests
+//  main.cpp - Test runner
 //  ExFATRestore
 //
 //  Created by Paul Ciarlo on 5 March 2019.
@@ -24,3 +24,16 @@
 //  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 //  SOFTWARE.
 //
+
+#define BOOST_TEST_MODULE libExFATRestore
+#define BOOST_TEST_DYN_LINK
+#include <boost/test/unit_test.hpp>
+
+BOOST_AUTO_TEST_SUITE(BoostTestSuite)
+
+BOOST_AUTO_TEST_CASE(TestBoost)
+{
+	BOOST_ASSERT(1+1==2);
+}
+
+BOOST_AUTO_TEST_SUITE_END()
