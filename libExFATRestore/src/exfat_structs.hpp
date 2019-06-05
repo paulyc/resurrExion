@@ -52,6 +52,7 @@ enum fs_directory_entry_t {
     WINDOWS_CE_ACT      = 0x22 | VALID,                         // 0xA2
     STREAM_EXTENSION    = 0x00 | VALID | CONTINUED,             // 0xC0
     FILE_NAME           = 0x01 | VALID | CONTINUED,             // 0xC1
+	WINDOWS_CE_ACL      = 0x02 | VALID | CONTINUED,             // 0xC2
     FILE_TAIL           = 0x00 | VALID | CONTINUED | OPTIONAL,  // 0xE0
 };
 
@@ -71,18 +72,21 @@ struct fs_entry {
     uint8_t type;
     uint8_t data[31];
 } __attribute__((packed));
+static_assert(sizeof(fs_entry) == 32);
 
 template <size_t SectorSize>
 struct fs_sector
 {
     uint8_t data[SectorSize];
 } __attribute__((packed));
+static_assert(sizeof(fs_sector<512>) == 512);
 
 template <size_t SectorSize, size_t SectorsPerCluster>
 struct fs_cluster
 {
     fs_sector<SectorSize> sectors[SectorsPerCluster];
 } __attribute__((packed));
+static_assert(sizeof(fs_cluster<512, 512>) == 512*512);
 
 enum fs_volume_flags_t {
     SECOND_FAT_ACTIVE   = 1<<0,
@@ -118,6 +122,7 @@ struct fs_volume_boot_record {
     uint16_t boot_signature             = 0xAA55;
     uint8_t  padding[SectorSize - 512] ;        // Padded out to sector size
 } __attribute__((packed));
+static_assert(sizeof(fs_volume_boot_record<512>) == 512);
 
 // for a 512-byte sector. should be same size as a sector
 template <size_t SectorSize>
@@ -125,11 +130,13 @@ struct fs_extended_boot_structure {
     uint8_t  extended_boot_code[SectorSize - 4] = {0};
     uint32_t extended_boot_signature = 0xAA550000;
 } __attribute__((packed));
+static_assert(sizeof(fs_extended_boot_structure<512>) == 512);
 
 template <size_t SectorSize>
 struct fs_main_extended_boot_region {
     fs_extended_boot_structure<SectorSize> ebs[8];
 } __attribute__((packed));
+static_assert(sizeof(fs_main_extended_boot_region<512>) == 8*512);
 
 // First 16 bytes of each field is a GUID and remaining 32 bytes are the parameters (undefined)
 template <size_t SectorSize>
@@ -146,6 +153,7 @@ struct fs_oem_parameters {
     uint8_t parameters9[48]             = {0};
     uint8_t reserved[SectorSize - 480]  = {0}; // 32-3616 bytes padded out to sector size
 } __attribute__((packed));
+static_assert(sizeof(fs_oem_parameters<512>) == 512);
 
 // one example of a parameter that would go in an OEM parameter but it's not used
 struct fs_flash_parameters {
@@ -195,6 +203,7 @@ struct fs_file_directory_entry {
     uint8_t  accessed_time_cs;
     uint8_t  reserved1[9]       = {0};
 } __attribute__((packed));
+static_assert(sizeof(fs_file_directory_entry) == 32);
 
 enum fs_file_flags_t {
     ALLOC_POSSIBLE  = 1<<0, // if 0, first cluster and data length will be undefined in directory entry
@@ -205,11 +214,12 @@ struct fs_primary_directory_entry {
     uint8_t  type;              // one of fs_directory_entry_t
     uint8_t  secondary_count;   // 0 - 255, number of children in directory
     uint16_t set_checksum;      // checksum of directory entries in this set, excluding this field
-    uint8_t  primary_flags;     // combination of fs_file_flags_t
+    uint16_t primary_flags;     // combination of fs_file_flags_t
     uint8_t  reserved[14] = {0};
     uint32_t first_cluster;
     uint64_t data_length;
 } __attribute__((packed));
+static_assert(sizeof(fs_primary_directory_entry) == 32);
 
 struct fs_secondary_directory_entry {
     uint8_t  type;              // one of fs_directory_entry_t
@@ -218,6 +228,7 @@ struct fs_secondary_directory_entry {
     uint32_t first_cluster;
     uint64_t data_length;
 } __attribute__((packed));
+static_assert(sizeof(fs_secondary_directory_entry) == 32);
 
 struct fs_stream_extension_entry {
 	uint8_t type            = STREAM_EXTENSION;
@@ -231,6 +242,7 @@ struct fs_stream_extension_entry {
     uint32_t first_cluster;
     uint64_t size;
 } __attribute__((packed));
+static_assert(sizeof(fs_stream_extension_entry) == 32);
 
 constexpr int FS_FILE_NAME_ENTRY_SIZE = 15;
 
@@ -239,6 +251,7 @@ struct fs_file_name_entry {
     uint8_t reserved    = 0;
     int16_t name[FS_FILE_NAME_ENTRY_SIZE];
 } __attribute__((packed));
+static_assert(sizeof(fs_file_name_entry) == 32);
 
 struct fs_allocation_bitmap_entry {
     uint8_t type            = ALLOCATION_BITMAP;
@@ -247,6 +260,7 @@ struct fs_allocation_bitmap_entry {
     uint32_t first_cluster; // First data cluster number
     uint64_t data_length;   // Size of allocation bitmap in bytes. Ceil(ClusterCount / 8)
 } __attribute__((packed));
+static_assert(sizeof(fs_allocation_bitmap_entry) == 32);
 
 template <size_t SectorSize, size_t SectorsPerCluster, size_t NumSectors>
 struct fs_allocation_bitmap_table
