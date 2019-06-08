@@ -1,6 +1,6 @@
 //
 //  filesystem.cpp - Filesystem tests
-//  ExFATRestore
+//  resurrExion
 //
 //  Created by Paul Ciarlo on 5 March 2019.
 //
@@ -30,7 +30,9 @@
 
 #include "../config/fsconfig.hpp"
 #include "../src/filesystem.hpp"
-using namespace io::github::paulyc;
+
+using github::paulyc::Loggable;
+using namespace github::paulyc::resurrExion::exfat;
 
 BOOST_AUTO_TEST_SUITE(FilesystemTestSuite)
 
@@ -38,14 +40,14 @@ BOOST_AUTO_TEST_CASE(TestStructs)
 {
 	Loggable l;
 
-	l.logf(Loggable::INFO, "sizeof(struct fs_boot_region) == %d\n", sizeof(struct fs_boot_region<512>));
-	BOOST_STATIC_ASSERT(sizeof(struct fs_boot_region<SectorSize>) % SectorSize == 0);
-	l.logf(Loggable::INFO, "sizeof(struct fs_file_allocation_table) == %d\n", sizeof(struct fs_file_allocation_table<SectorSize, SectorsPerCluster, NumSectors>));
-	BOOST_STATIC_ASSERT(sizeof(struct fs_file_allocation_table<SectorSize, SectorsPerCluster, NumSectors>) % 512 == 0);
+    l.logf(Loggable::INFO, "sizeof(struct fs_boot_region) == %d\n", sizeof(boot_region_t<512>));
+    BOOST_STATIC_ASSERT(sizeof(boot_region_t<SectorSize>) % SectorSize == 0);
+    l.logf(Loggable::INFO, "sizeof(struct fs_file_allocation_table) == %d\n", sizeof(file_allocation_table_t<SectorSize, SectorsPerCluster, NumSectors>));
+    BOOST_STATIC_ASSERT(sizeof(file_allocation_table_t<SectorSize, SectorsPerCluster, NumSectors>) % 512 == 0);
 
 	constexpr size_t fs_headers_size_bytes =
-	sizeof(fs_boot_region<SectorSize>) * 2 +
-	sizeof(fs_fat_region<SectorSize, SectorsPerCluster, ClustersInFat>);
+    sizeof(boot_region_t<SectorSize>) * 2 +
+    sizeof(fat_region_t<SectorSize, SectorsPerCluster, ClustersInFat>);
 	BOOST_ASSERT((fs_headers_size_bytes % SectorSize) == 0);
 	constexpr size_t fs_headers_size_sectors = fs_headers_size_bytes / SectorSize;
 	l.logf(Loggable::INFO, "ClustersInFat == %08x\n", ClustersInFat);

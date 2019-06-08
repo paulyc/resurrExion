@@ -1,6 +1,6 @@
 //
 //  entity.cpp - File/Directory Entity on Disk
-//  ExFATRestore
+//  resurrExion
 //
 //  Created by Paul Ciarlo on 9 March 2019.
 //
@@ -27,13 +27,12 @@
 
 #include "entity.hpp"
 
-namespace io {
 namespace github {
 namespace paulyc {
-namespace ExFATRestore {
+namespace resurrExion {
 
 BaseEntity::BaseEntity(void *entry_start, uint8_t num_entries, std::shared_ptr<BaseEntity> parent, const std::string &name) :
-    _fs_entries((struct fs_entry *)entry_start),
+    _fs_entries((exfat::metadata_entry_u*)entry_start),
     _num_entries(num_entries),
     _parent(parent),
     _name(name)
@@ -50,7 +49,6 @@ DirectoryEntity::DirectoryEntity(
 
 }
 
-}
-}
-}
-}
+} /* namespace resurrExion */
+} /* namespace paulyc */
+} /* namespace github */

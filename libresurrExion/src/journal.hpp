@@ -1,6 +1,6 @@
 //
 //  journal.hpp - journal for filesystem changes capable of rollbacks
-//  ExFATRestore
+//  resurrExion
 //
 //  Created by Paul Ciarlo on 19 March 2019.
 //
@@ -25,8 +25,8 @@
 //  SOFTWARE.
 //
 
-#ifndef _io_github_paulyc_journal_hpp_
-#define _io_github_paulyc_journal_hpp_
+#ifndef _github_paulyc_journal_hpp_
+#define _github_paulyc_journal_hpp_
 
 #include <deque>
 #include <memory>
@@ -34,7 +34,6 @@
 #include <exception>
 #include <fstream>
 
-namespace io {
 namespace github {
 namespace paulyc {
 
@@ -80,6 +79,5 @@ private:
 
 } /* namespace paulyc */
 } /* namespace github */
-} /* namespace io */
 
-#endif /* _io_github_paulyc_journal_hpp_ */
+#endif /* _github_paulyc_journal_hpp_ */

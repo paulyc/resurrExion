@@ -1,6 +1,6 @@
 //
 //  main.cpp - Test runner
-//  ExFATRestore
+//  resurrExion
 //
 //  Created by Paul Ciarlo on 5 March 2019.
 //
@@ -25,7 +25,7 @@
 //  SOFTWARE.
 //
 
-#define BOOST_TEST_MODULE libExFATRestore
+#define BOOST_TEST_MODULE libresurrExion
 #define BOOST_TEST_DYN_LINK
 #include <boost/test/unit_test.hpp>
 

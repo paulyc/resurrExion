@@ -36,10 +36,10 @@ set(TEST_SOURCES
 )
 
 add_executable(
-	testlibExFATRestore
+        testresurrExion
 	${TEST_HEADERS}
 	${TEST_SOURCES}
 )
 
-target_include_directories(testlibExFATRestore PUBLIC ${Boost_INCLUDE_DIRS})
-target_link_libraries(testlibExFATRestore ExFATRestore ${Boost_LIBRARIES})
+target_include_directories(testresurrExion PUBLIC ${Boost_INCLUDE_DIRS})
+target_link_libraries(testresurrExion resurrExion ${Boost_LIBRARIES})

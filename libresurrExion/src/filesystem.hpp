@@ -1,6 +1,6 @@
 //
 //  filesystem.hpp
-//  ExFATRestore
+//  resurrExion
 //
 //  Created by Paul Ciarlo on 2/11/19.
 //
@@ -25,8 +25,8 @@
 //  SOFTWARE.
 //
 
-#ifndef _io_github_paulyc_filesystem_hpp_
-#define _io_github_paulyc_filesystem_hpp_
+#ifndef _github_paulyc_filesystem_hpp_
+#define _github_paulyc_filesystem_hpp_
 
 #include <stdint.h>
 
@@ -44,10 +44,9 @@
 #include "logger.hpp"
 #include "entity.hpp"
 
-namespace io {
 namespace github {
 namespace paulyc {
-namespace ExFATRestore {
+namespace resurrExion {
 
 class BaseEntity;
 
@@ -86,27 +85,26 @@ private:
     uint8_t *_partition_end;
 
     // not part of actual partition, to be copied over later after being initialized
-    fs_boot_region<SectorSize> _boot_region;
-    fs_file_allocation_table<SectorSize, SectorsPerCluster, ClustersInFat> _fat;
-    fs_allocation_bitmap_table<SectorSize, SectorsPerCluster, ClustersInFat> _allocation_bitmap;
-    fs_upcase_table<SectorSize, 256> _upcase_table;
-    fs_root_directory<SectorSize, SectorsPerCluster> _root_directory;
+    exfat::boot_region_t<SectorSize> _boot_region;
+    exfat::file_allocation_table_t<SectorSize, SectorsPerCluster, ClustersInFat> _fat;
+    exfat::allocation_bitmap_table_t<SectorSize, SectorsPerCluster, ClustersInFat> _allocation_bitmap;
+    exfat::upcase_table_t<SectorSize, 256> _upcase_table;
+    exfat::root_directory_t<SectorSize, SectorsPerCluster> _root_directory;
 
     // pointer to the start of the actual mmap()ed partition
-    fs_filesystem<SectorSize, SectorsPerCluster, NumSectors> *_fs; // actual mmaped filesystem
+    exfat::filesystem_t<SectorSize, SectorsPerCluster, NumSectors> *_fs; // actual mmaped filesystem
 
-    std::unordered_map<fs_entry*, std::shared_ptr<BaseEntity>> _offset_to_entity_mapping;
+    std::unordered_map<exfat::metadata_entry_u*, std::shared_ptr<BaseEntity>> _offset_to_entity_mapping;
     std::unique_ptr<RootDirectoryEntity> _root_directory_entity;
     std::wstring_convert<std::codecvt_utf8_utf16<char16_t>, char16_t> _cvt;
 
     std::vector<char16_t> _invalid_file_name_characters;
 };
 
-}
-}
-}
-}
+} /* namespace resurrExion */
+} /* namespace paulyc */
+} /* namespace github */
 
 #include "filesystem.cpp"
 
-#endif /* _io_github_paulyc_filesystem_hpp_ */
+#endif /* _github_paulyc_filesystem_hpp_ */

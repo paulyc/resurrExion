@@ -1,6 +1,6 @@
 //
 //  recoverylog.cpp
-//  ExFATRestore
+//  resurrExion
 //
 //  Created by Paul Ciarlo on 2/12/19.
 //
@@ -25,8 +25,6 @@
 //  SOFTWARE.
 //
 
-#include "recoverylog.hpp"
-
 #include <stdio.h>
 #include <string.h>
 
@@ -38,7 +36,7 @@
 #include <regex>
 
 #if 0
-using namespace io::github::paulyc::ExFATRestore;
+using namespace github::paulyc::resurrExion;
 
 template <typename Filesystem_T>
 void RecoveryLogTextWriter<Filesystem_T>::writeTextLog(

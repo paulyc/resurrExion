@@ -1,6 +1,6 @@
 //
 //  journal.cpp - Write journal tests
-//  ExFATRestore
+//  resurrExion
 //
 //  Created by Paul Ciarlo on 19 March 2019.
 //

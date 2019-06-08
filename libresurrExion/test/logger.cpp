@@ -1,6 +1,6 @@
 //
 //  logger.cpp - Console/file/syslog logging interface tests
-//  ExFATRestore
+//  resurrExion
 //
 //  Created by Paul Ciarlo on 5 March 2019.
 //
@@ -29,7 +29,7 @@
 #include <boost/test/unit_test.hpp>
 
 #include "logger.hpp"
-using io::github::paulyc::Loggable;
+using github::paulyc::Loggable;
 
 BOOST_AUTO_TEST_SUITE(LoggerTestSuite)
 

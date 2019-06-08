@@ -1,6 +1,6 @@
 //
 //  exception.hpp
-//  ExFATRestore
+//  resurrExion
 //
 //  Created by Paul Ciarlo on 2/12/19.
 //
@@ -25,15 +25,14 @@
 //  SOFTWARE.
 //
 
-#ifndef _io_github_paulyc_exception_hpp_
-#define _io_github_paulyc_exception_hpp_
+#ifndef _github_paulyc_exception_hpp_
+#define _github_paulyc_exception_hpp_
 
 #include <string>
 #include <iostream>
 #include <exception>
 #include <system_error>
 
-namespace io {
 namespace github {
 namespace paulyc {
 
@@ -45,23 +44,22 @@ inline void assertBreakpoint(bool test, std::string msg)
     }
 }
 
-}
-}
-}
+} /* namespace paulyc */
+} /* namespace github */
 
-#define _io_github_paulyc_STRINGIFY(x) #x
-#define _io_github_paulyc_STRING(l) _io_github_paulyc_STRINGIFY(l)
-#define _io_github_paulyc_FILELINE __FILE__ ":" _io_github_paulyc_STRING(__LINE__)
+#define _github_paulyc_STRINGIFY(x) #x
+#define _github_paulyc_STRING(l) _github_paulyc_STRINGIFY(l)
+#define _github_paulyc_FILELINE __FILE__ ":" _github_paulyc_STRING(__LINE__)
 
 #ifdef _DEBUG
 
-#define ASSERT_BP(test, msg) io::github::paulyc::assertBreakpoint((test), (msg))
+#define ASSERT_BP(test, msg) github::paulyc::assertBreakpoint((test), (msg))
 
 #define ASSERT_THROW(assertion) \
 do { \
 if ((bool)(assertion) == false) { \
 throw std::runtime_error(\
-"[" _io_github_paulyc_FILELINE  "] Assertion failed: " _io_github_paulyc_STRINGIFY(assertion) \
+"[" _github_paulyc_FILELINE  "] Assertion failed: " _github_paulyc_STRINGIFY(assertion) \
 );}} while (0);
 
 #else /* _DEBUG */
@@ -71,4 +69,4 @@ throw std::runtime_error(\
 
 #endif /* _DEBUG */
 
-#endif /* _io_github_paulyc_exception_hpp_ */
+#endif /* _github_paulyc_exception_hpp_ */

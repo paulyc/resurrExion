@@ -24,4 +24,4 @@
 
 add_executable(resurrEx main.cpp)
 target_include_directories(resurrEx PUBLIC ${Boost_INCLUDE_DIRS} ../../libresurrExion/src)
-target_link_libraries(resurrEx ExFATRestore ${Boost_LIBRARIES})
+target_link_libraries(resurrEx resurrExion ${Boost_LIBRARIES})

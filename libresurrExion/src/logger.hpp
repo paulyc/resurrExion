@@ -1,6 +1,6 @@
 //
 //  logger.hpp - Console/file/syslog logging interface
-//  ExFATRestore
+//  resurrExion
 //
 //  Created by Paul Ciarlo on 5 March 2019.
 //
@@ -25,8 +25,8 @@
 //  SOFTWARE.
 //
 
-#ifndef _io_github_paulyc_logger_hpp_
-#define _io_github_paulyc_logger_hpp_
+#ifndef _github_paulyc_logger_hpp_
+#define _github_paulyc_logger_hpp_
 
 #if USE_LOG4CPLUS
 #include <log4cplus/logger.h>
@@ -38,7 +38,6 @@
 #include <memory>
 #include <sstream>
 
-namespace io {
 namespace github {
 namespace paulyc {
 
@@ -57,7 +56,7 @@ public:
     };
 
     Loggable();
-    virtual ~Loggable() {}
+    ~Loggable() = default;
 
     void logf(LogLevel l, const char *fmt, ...);
     void formatLogPrefix(std::ostringstream &prefix, LogLevel l);
@@ -69,8 +68,7 @@ private:
 };
 
 
-}
-}
-}
+} /* namespace paulyc */
+} /* namespace github */
 
-#endif /* _io_github_paulyc_logger_hpp_ */
+#endif /* _github_paulyc_logger_hpp_ */

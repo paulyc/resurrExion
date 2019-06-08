@@ -1,6 +1,6 @@
 //
 //  fsconfig.hpp - Parameters of a specific ExFAT filesystem
-//  ExFATRestore
+//  resurrExion
 //
 //  Created by Paul Ciarlo on 15 March 2019.
 //
@@ -25,8 +25,8 @@
 //  SOFTWARE.
 //
 
-#ifndef _io_github_paulyc_exfat_fsconfig_hpp_
-#define _io_github_paulyc_exfat_fsconfig_hpp_
+#ifndef _github_paulyc_exfat_fsconfig_hpp_
+#define _github_paulyc_exfat_fsconfig_hpp_
 
 /*
  static constexpr size_t sector_size_bytes = 512; // bytes 0x0200
@@ -42,6 +42,8 @@
  static constexpr size_t start_offset_sector = start_offset_bytes / sector_size_bytes;
  */
 
+#include <cstddef>
+
 constexpr static size_t SectorSize = 512;
 constexpr static size_t SectorsPerCluster = 512;
 constexpr static size_t NumSectors = 7813560247;
@@ -50,4 +52,4 @@ constexpr static size_t PartitionStartSector = 0x64028;
 constexpr static size_t ClusterHeapStartSector = 0x283D8; // relative to partition start
 constexpr static size_t DiskSize = (NumSectors + PartitionStartSector) * SectorSize;
 
-#endif /* _io_github_paulyc_exfat_fsconfig_hpp_ */
+#endif /* _github_paulyc_exfat_fsconfig_hpp_ */

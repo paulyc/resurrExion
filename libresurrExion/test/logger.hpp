@@ -1,6 +1,6 @@
 //
 //  logger.hpp - Console/file/syslog logging interface tests
-//  ExFATRestore
+//  resurrExion
 //
 //  Created by Paul Ciarlo on 5 March 2019.
 //
@@ -25,9 +25,9 @@
 //  SOFTWARE.
 //
 
-#ifndef _io_github_paulyc_logger_hpp_test_
-#define _io_github_paulyc_logger_hpp_test_
+#ifndef _github_paulyc_logger_hpp_test_
+#define _github_paulyc_logger_hpp_test_
 
 #include "../src/logger.hpp"
 
-#endif /* _io_github_paulyc_logger_hpp_test_ */
+#endif /* _github_paulyc_logger_hpp_test_ */

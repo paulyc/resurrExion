@@ -1,6 +1,6 @@
 //
 //  entity.hpp - File/Directory Entity on Disk
-//  ExFATRestore
+//  resurrExion
 //
 //  Created by Paul Ciarlo on 9 March 2019.
 //
@@ -25,8 +25,8 @@
 //  SOFTWARE.
 //
 
-#ifndef _io_github_paulyc_entity_hpp_
-#define _io_github_paulyc_entity_hpp_
+#ifndef _github_paulyc_entity_hpp_
+#define _github_paulyc_entity_hpp_
 
 #include "exfat_structs.hpp"
 
@@ -34,31 +34,30 @@
 #include <string>
 #include <memory>
 
-namespace io {
 namespace github {
 namespace paulyc {
-namespace ExFATRestore {
+namespace resurrExion {
 
 class BaseEntity
 {
 public:
     BaseEntity(void *entry_start, uint8_t num_entries, std::shared_ptr<BaseEntity> parent, const std::string &name);
-    virtual ~BaseEntity() {}
+    ~BaseEntity() = default;
 
-    fs_entry *get_entity_start() const {
+    exfat::metadata_entry_u *get_entity_start() const {
         return _fs_entries;
     }
     uint8_t get_num_entries() const {
         return _num_entries;
     }
     size_t get_file_info_size() const {
-        return _num_entries * sizeof(struct fs_entry);
+        return _num_entries * sizeof(exfat::metadata_entry_u);
     }
     uint32_t get_start_cluster() const {
-        return ((struct fs_stream_extension_entry *)(_fs_entries + 1))->first_cluster;
+        return (_fs_entries + 1)->stream_extension_entry.first_cluster;
     }
     uint64_t get_size() const {
-        return ((struct fs_stream_extension_entry *)(_fs_entries + 1))->size;
+        return (_fs_entries + 1)->stream_extension_entry.size;
     }
     std::string get_name() const {
         return _name;
@@ -70,7 +69,7 @@ public:
         _parent = parent;
     }
 protected:
-    struct fs_entry *_fs_entries;
+    exfat::metadata_entry_u *_fs_entries;
     uint8_t _num_entries;
     std::shared_ptr<BaseEntity> _parent;
     std::string _name;
@@ -79,11 +78,11 @@ protected:
 class FileEntity : public BaseEntity
 {
 public:
-    FileEntity(void *entry_start, int num_entries, std::shared_ptr<BaseEntity> parent, const std::string &name) :
+    FileEntity(void *entry_start, uint8_t num_entries, std::shared_ptr<BaseEntity> parent, const std::string &name) :
         BaseEntity(entry_start, num_entries, parent, name) {}
 
     bool is_contiguous() const {
-        return ((struct fs_stream_extension_entry *)(this->_fs_entries + 1))->flags & CONTIGUOUS;
+        return (this->_fs_entries + 1)->stream_extension_entry.flags & exfat::CONTIGUOUS;
     }
 };
 
@@ -105,9 +104,8 @@ public:
     RootDirectoryEntity(void *entry_start) : DirectoryEntity(entry_start, 0, nullptr, "ROOT") {}
 };
 
-}
-}
-}
-}
+} /* namespace resurrExion */
+} /* namespace paulyc */
+} /* namespace github */
 
-#endif /* _io_github_paulyc_entity_hpp_ */
+#endif /* _github_paulyc_entity_hpp_ */

@@ -1,6 +1,6 @@
 //
 //  recoverylog.hpp
-//  ExFATRestore
+//  resurrExion
 //
 //  Created by Paul Ciarlo on 2/12/19.
 //
@@ -25,8 +25,8 @@
 //  SOFTWARE.
 //
 
-#ifndef _io_github_paulyc_recoverylog_hpp_
-#define _io_github_paulyc_recoverylog_hpp_
+#ifndef _github_paulyc_recoverylog_hpp_
+#define _github_paulyc_recoverylog_hpp_
 
 #include <string>
 #include <fstream>
@@ -35,13 +35,14 @@
 #include <locale>
 #include <codecvt>
 #include <regex>
+#include <iostream>
 
 #include "logger.hpp"
+#include "exfat_structs.hpp"
 
-namespace io {
 namespace github {
 namespace paulyc {
-namespace ExFATRestore {
+namespace resurrExion {
 
 constexpr int exfat_filename_maxlen = 256;
 constexpr int exfat_filename_maxlen_utf8 = exfat_filename_maxlen * 2;
@@ -58,13 +59,13 @@ public:
 protected:
     std::string _get_utf8_filename(uint8_t *fh, int namelen)
     {
-        struct fs_file_directory_entry *fde = (struct fs_file_directory_entry *)fh;
+        exfat::file_directory_entry_t *fde = (exfat::file_directory_entry_t *)fh;
         const int continuations = fde->continuations;
         std::basic_string<char16_t> u16s;
         for (int c = 1; c <= continuations; ++c) {
             fh += 32;
-            if (fh[0] == FILE_NAME) {
-                struct fs_file_name_entry *n = (struct fs_file_name_entry*)fh;
+            if (fh[0] == exfat::FILE_NAME) {
+                exfat::file_name_entry_t *n = (exfat::file_name_entry_t*)fh;
                 for (int i = 0; i < sizeof(n->name); ++i) {
                     if (u16s.length() == namelen) {
                         return _cvt.to_bytes(u16s);
@@ -186,7 +187,6 @@ private:
     std::ofstream _logfile;
 };
 
-}
 }
 }
 }

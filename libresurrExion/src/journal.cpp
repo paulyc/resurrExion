@@ -32,7 +32,6 @@
 #include <memory>
 #include <string.h>
 
-namespace io {
 namespace github {
 namespace paulyc {
 
@@ -105,4 +104,3 @@ void TransactionJournal::Diff::unapply()
 
 } /* namespace paulyc */
 } /* namespace github */
-} /* namespace io */

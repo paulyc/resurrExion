@@ -1,5 +1,5 @@
 #
-# ExFATRestore - recover damaged ExFAT filesystem
+# resurrExion - recover damaged ExFAT filesystem
 #
 # Copyright (C) 2019 Paul Ciarlo <paul.ciarlo@gmail.com>
 #

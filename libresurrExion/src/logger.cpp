@@ -1,6 +1,6 @@
 //
 //  logger.cpp - Console/file/syslog logging interface
-//  ExFATRestore
+//  resurrExion
 //
 //  Created by Paul Ciarlo on 5 March 2019.
 //
@@ -34,15 +34,14 @@
 
 #include "logger.hpp"
 
-namespace io {
 namespace github {
 namespace paulyc {
 
 class LoggerInterface
 {
 public:
-    LoggerInterface() {}
-    virtual ~LoggerInterface() {}
+    LoggerInterface() = default;
+    ~LoggerInterface() = default;
 
     virtual void writeToLog(const std::string &msg) = 0;
 };
@@ -65,7 +64,7 @@ typedef Log4cplusInterface DefaultLoggerInterface;
 class ConsoleInterface : public LoggerInterface
 {
 public:
-    ConsoleInterface() {}
+    ConsoleInterface() = default;
 
     virtual void writeToLog(const std::string &msg) { std::cerr << msg << std::endl; }
 };
@@ -145,6 +144,5 @@ void Loggable::formatLogPrefix(std::ostringstream &prefix, LogLevel l)
     prefix << std::put_time(std::localtime(&current_tm), "%F %T%z") << "] ";// << "] [" << _type_str << "] ";
 }
 
-}
-}
-}
+} /* namespace paulyc */
+} /* namespace github */

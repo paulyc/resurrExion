@@ -1,6 +1,6 @@
 //
 //  filesystem.hpp - Write journal tests
-//  ExFATRestore
+//  resurrExion
 //
 //  Created by Paul Ciarlo on 19 March 2019.
 //
@@ -25,15 +25,15 @@
 //  SOFTWARE.
 //
 
-#ifndef _io_github_paulyc_journal_hpp_test_
-#define _io_github_paulyc_journal_hpp_test_
+#ifndef _github_paulyc_journal_hpp_test_
+#define _github_paulyc_journal_hpp_test_
 
 #include "../src/logger.hpp"
 #include "../src/journal.hpp"
 
-class JournalTest : public io::github::paulyc::Loggable
+class JournalTest : public github::paulyc::Loggable
 {
-	io::github::paulyc::TransactionJournal _journal;
+    github::paulyc::TransactionJournal _journal;
     uint8_t _test_buffer[1024] = {0};
 public:
     JournalTest() : _journal(_test_buffer, "") {}
@@ -51,4 +51,4 @@ public:
     }
 };
 
-#endif /* _io_github_paulyc_journal_hpp_test_ */
+#endif /* _github_paulyc_journal_hpp_test_ */

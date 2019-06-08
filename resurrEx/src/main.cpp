@@ -1,6 +1,6 @@
 //
 //  main.cpp
-//  ExFATRestore
+//  resurrExion
 //
 //  Created by Paul Ciarlo on 2/11/19.
 //
@@ -72,7 +72,7 @@ int main(int argc, const char * argv[]) {
     }
 
     try {
-        io::github::paulyc::ExFATRestore::ExFATFilesystem<SectorSize, SectorsPerCluster, NumSectors>  fs(argv[1], DiskSize, PartitionStartSector, false);
+        github::paulyc::resurrExion::ExFATFilesystem<SectorSize, SectorsPerCluster, NumSectors>  fs(argv[1], DiskSize, PartitionStartSector, false);
         fs.init_metadata();
     } catch (std::exception &ex) {
         std::cerr << "Exception " << typeid(ex).name() << " caught: " << ex.what() << std::endl;
@@ -87,7 +87,7 @@ int main(int argc, const char * argv[]) {
     }
 
     try {
-        io::github::paulyc::ExFATRestore::ExFATFilesystem<SectorSize, 512, 7813560247>  fs(argv[1], 4000000000000, 409640);
+        github::paulyc::resurrExion::ExFATFilesystem<SectorSize, 512, 7813560247>  fs(argv[1], 4000000000000, 409640);
         fs.restore_all_files(argv[3], argv[2]);
     } catch (std::exception &ex) {
         std::cerr << "Exception " << typeid(ex).name() << " caught: " << ex.what() << std::endl;
@@ -102,7 +102,7 @@ int main(int argc, const char * argv[]) {
     }
 
     try {
-        io::github::paulyc::ExFATRestore::FileRestorer restorer(argv[1], argv[3]);
+        github::paulyc::resurrExion::FileRestorer restorer(argv[1], argv[3]);
         restorer.restore_all_files(argv[2]);
     } catch (std::exception &ex) {
         std::cerr << "Exception " << typeid(ex).name() << " caught: " << ex.what() << std::endl;
@@ -117,7 +117,7 @@ int main(int argc, const char * argv[]) {
     }
 
     try {
-        io::github::paulyc::ExFATRestore::RecoveryLogWriter writer;
+        github::paulyc::resurrExion::RecoveryLogWriter writer;
         writer.textLogToBinLog(argv[1], argv[2], argv[3]);
     } catch (std::exception &e) {
         std::cerr << "Exception caught: " << e.what() << std::endl;
@@ -132,7 +132,7 @@ int main(int argc, const char * argv[]) {
     }
 
     try {
-        io::github::paulyc::ExFATRestore::RecoveryLogWriter writer;
+        github::paulyc::resurrExion::RecoveryLogWriter writer;
         writer.writeLog(argv[1], argv[2]);
     } catch (std::exception &e) {
         std::cerr << "Exception caught: " << e.what() << std::endl;
@@ -146,7 +146,7 @@ int main(int argc, const char * argv[]) {
     }
     
     try {
-        io::github::paulyc::ExFATRestore::RecoveryLogReader reader;
+        github::paulyc::resurrExion::RecoveryLogReader reader;
         reader.parse(std::string(argv[1]), std::string(argv[2]), std::string(argv[3]));
     } catch (std::exception &e) {
         std::cerr << "Exception caught: " << e.what() << std::endl;
