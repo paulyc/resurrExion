@@ -22,37 +22,6 @@
 # SOFTWARE.
 #
 
-set(LIB_HEADERS
-	../config/fsconfig.hpp
-	entity.hpp
-	exfat_structs.hpp
-	exception.hpp
-	filesystem.hpp
-	journal.hpp
-	logger.hpp
-	recoverylog.hpp
-)
-
-set(LIB_COMPILE_SOURCES
-	entity.cpp
-	exception.cpp
-	journal.cpp
-	logger.cpp
-)
-
-set(LIB_NO_COMPILE_SOURCES
-	filesystem.cpp
-	recoverylog.cpp
-)
-
-add_library(
-	ExFATRestore
-	SHARED
-	${LIB_HEADERS}
-	${LIB_COMPILE_SOURCES}
-	${LIB_NO_COMPILE_SOURCES}
-)
-
-set_source_files_properties(${LIB_NO_COMPILE_SOURCES} PROPERTIES HEADER_FILE_ONLY TRUE)
-target_include_directories(ExFATRestore PUBLIC ../config)
-target_link_libraries(ExFATRestore pthread)
+add_executable(resurrEx main.cpp)
+target_include_directories(resurrEx PUBLIC ${Boost_INCLUDE_DIRS} ../../libresurrExion/src)
+target_link_libraries(resurrEx ExFATRestore ${Boost_LIBRARIES})

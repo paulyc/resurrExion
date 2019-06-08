@@ -22,6 +22,37 @@
 # SOFTWARE.
 #
 
-add_executable(restore main.cpp)
-target_include_directories(restore PUBLIC ${Boost_INCLUDE_DIRS} ../../libExFATRestore/src)
-target_link_libraries(restore ExFATRestore ${Boost_LIBRARIES})
+set(LIB_HEADERS
+	../config/fsconfig.hpp
+	entity.hpp
+	exfat_structs.hpp
+	exception.hpp
+	filesystem.hpp
+	journal.hpp
+	logger.hpp
+	recoverylog.hpp
+)
+
+set(LIB_COMPILE_SOURCES
+	entity.cpp
+	exception.cpp
+	journal.cpp
+	logger.cpp
+)
+
+set(LIB_NO_COMPILE_SOURCES
+	filesystem.cpp
+	recoverylog.cpp
+)
+
+add_library(
+	resurrExion
+	SHARED
+	${LIB_HEADERS}
+	${LIB_COMPILE_SOURCES}
+	${LIB_NO_COMPILE_SOURCES}
+)
+
+set_source_files_properties(${LIB_NO_COMPILE_SOURCES} PROPERTIES HEADER_FILE_ONLY TRUE)
+target_include_directories(resurrExion PUBLIC ../config)
+target_link_libraries(resurrExion pthread)

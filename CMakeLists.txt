@@ -24,7 +24,7 @@
 
 cmake_minimum_required(VERSION 3.10.3)
 
-project(ExFATRestore)
+project(resurrExion)
 
 # https://cmake.org/cmake/help/latest/prop_tgt/CXX_STANDARD.html
 set(CMAKE_CXX_STANDARD 17)
@@ -37,6 +37,6 @@ set(CMAKE_C_STANDARD 11)
 
 find_package(Boost 1.58.0 REQUIRED system date_time unit_test_framework program_options)
 
-add_subdirectory(libExFATRestore)
-add_subdirectory(restore)
+add_subdirectory(libresurrExion)
+add_subdirectory(resurrEx)
 
