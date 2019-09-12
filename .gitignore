@@ -37,3 +37,7 @@ build
 
 *.kdev4
 xcodebuild
+resurrExion.xcodeproj/project.xcworkspace
+
+# QT Creator
+*.user*
