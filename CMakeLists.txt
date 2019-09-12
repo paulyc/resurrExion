@@ -35,7 +35,7 @@ set(CMAKE_C_STANDARD 11)
 #set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=c11")
 #set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++17")
 
-find_package(Boost 1.58.0 REQUIRED system date_time unit_test_framework program_options)
+find_package(Boost 1.70.0 REQUIRED system date_time unit_test_framework program_options)
 
 add_subdirectory(libresurrExion)
 add_subdirectory(resurrEx)

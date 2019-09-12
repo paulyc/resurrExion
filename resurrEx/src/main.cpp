@@ -33,6 +33,8 @@
 #include "filesystem.hpp"
 #include "../config/fsconfig.hpp"
 
+using github::paulyc::resurrExion::ExFATFilesystem;
+
 struct Options
 {
     std::string deviceFileName;
@@ -72,7 +74,7 @@ int main(int argc, const char * argv[]) {
     }
 
     try {
-        github::paulyc::resurrExion::ExFATFilesystem<SectorSize, SectorsPerCluster, NumSectors>  fs(argv[1], DiskSize, PartitionStartSector, false);
+        ExFATFilesystem<SectorSize, SectorsPerCluster, NumSectors>  fs(argv[1], DiskSize, PartitionStartSector, false);
         fs.init_metadata();
     } catch (std::exception &ex) {
         std::cerr << "Exception " << typeid(ex).name() << " caught: " << ex.what() << std::endl;

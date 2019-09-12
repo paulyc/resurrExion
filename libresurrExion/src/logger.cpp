@@ -83,7 +83,7 @@ namespace {
 }
 
 Loggable::Loggable() :
-    _level(DEBUG),
+    _level(DEBUG_),
     _type_str(typeid(this).name())
 {
 }
@@ -120,7 +120,7 @@ void Loggable::formatLogPrefix(std::ostringstream &prefix, LogLevel l)
         case TRACE:
             prefix << "[TRACE]    [";
             break;
-        case DEBUG:
+        case DEBUG_:
             prefix << "[DEBUG]    [";
             break;
         case INFO:
