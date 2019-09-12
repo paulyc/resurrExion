@@ -37,3 +37,4 @@ build
 
 *.kdev4
 xcodebuild
+resurrExion.xcodeproj/project.xcworkspace

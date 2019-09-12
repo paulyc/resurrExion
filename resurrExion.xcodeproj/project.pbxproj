@@ -1,0 +1,648 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 50;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		5FA2AC4E232A9AE0007A8482 /* logger.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 5FA2AC35232A9AE0007A8482 /* logger.hpp */; };
+		5FA2AC55232A9AE0007A8482 /* fsconfig.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 5FA2AC3E232A9AE0007A8482 /* fsconfig.hpp */; };
+		5FA2AC56232A9AE0007A8482 /* logger.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 5FA2AC40232A9AE0007A8482 /* logger.hpp */; };
+		5FA2AC57232A9AE0007A8482 /* exception.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 5FA2AC42232A9AE0007A8482 /* exception.cpp */; };
+		5FA2AC59232A9AE0007A8482 /* entity.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 5FA2AC44232A9AE0007A8482 /* entity.cpp */; };
+		5FA2AC5A232A9AE0007A8482 /* filesystem.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 5FA2AC45232A9AE0007A8482 /* filesystem.hpp */; };
+		5FA2AC5B232A9AE0007A8482 /* journal.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 5FA2AC46232A9AE0007A8482 /* journal.cpp */; };
+		5FA2AC5D232A9AE0007A8482 /* journal.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 5FA2AC48232A9AE0007A8482 /* journal.hpp */; };
+		5FA2AC5E232A9AE0007A8482 /* logger.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 5FA2AC49232A9AE0007A8482 /* logger.cpp */; };
+		5FA2AC5F232A9AE0007A8482 /* exfat_structs.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 5FA2AC4A232A9AE0007A8482 /* exfat_structs.hpp */; };
+		5FA2AC60232A9AE0007A8482 /* exception.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 5FA2AC4B232A9AE0007A8482 /* exception.hpp */; };
+		5FA2AC61232A9AE0007A8482 /* entity.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 5FA2AC4C232A9AE0007A8482 /* entity.hpp */; };
+		5FA2AC62232A9AE0007A8482 /* recoverylog.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 5FA2AC4D232A9AE0007A8482 /* recoverylog.hpp */; };
+		5FA2AC75232A9B8F007A8482 /* filesystem.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 5FA2AC39232A9AE0007A8482 /* filesystem.cpp */; };
+		5FA2AC77232A9BAA007A8482 /* main.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 5FA2AC3C232A9AE0007A8482 /* main.cpp */; };
+		5FA2AC79232A9BC3007A8482 /* journal.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 5FA2AC38232A9AE0007A8482 /* journal.cpp */; };
+		5FA2AC7A232A9BDA007A8482 /* logger.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 5FA2AC3B232A9AE0007A8482 /* logger.cpp */; };
+		5FA2AC86232A9C23007A8482 /* main.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 5FA2AC69232A9B23007A8482 /* main.cpp */; };
+		5FEB8392232A9E87007A8482 /* libresurrExion.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = 5FA2AC24232A9A71007A8482 /* libresurrExion.dylib */; };
+		5FEB8393232A9E8E007A8482 /* libresurrExion.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = 5FA2AC24232A9A71007A8482 /* libresurrExion.dylib */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		5FA2AC87232A9C40007A8482 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 5FA2AC1C232A9A71007A8482 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 5FA2AC23232A9A71007A8482;
+			remoteInfo = resurrExion;
+		};
+		5FA2AC89232A9C4A007A8482 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 5FA2AC1C232A9A71007A8482 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 5FA2AC23232A9A71007A8482;
+			remoteInfo = resurrExion;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		5FA2AC6C232A9B6C007A8482 /* CopyFiles */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = /usr/share/man/man1/;
+			dstSubfolderSpec = 0;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 1;
+		};
+		5FA2AC7D232A9C14007A8482 /* CopyFiles */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = /usr/share/man/man1/;
+			dstSubfolderSpec = 0;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 1;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
+/* Begin PBXFileReference section */
+		5FA2AC24232A9A71007A8482 /* libresurrExion.dylib */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.dylib"; includeInIndex = 0; path = libresurrExion.dylib; sourceTree = BUILT_PRODUCTS_DIR; };
+		5FA2AC33232A9AE0007A8482 /* CMakeLists.txt */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = CMakeLists.txt; sourceTree = "<group>"; };
+		5FA2AC35232A9AE0007A8482 /* logger.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = logger.hpp; sourceTree = "<group>"; };
+		5FA2AC36232A9AE0007A8482 /* CMakeLists.txt */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = CMakeLists.txt; sourceTree = "<group>"; };
+		5FA2AC37232A9AE0007A8482 /* filesystem.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = filesystem.hpp; sourceTree = "<group>"; };
+		5FA2AC38232A9AE0007A8482 /* journal.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = journal.cpp; sourceTree = "<group>"; };
+		5FA2AC39232A9AE0007A8482 /* filesystem.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = filesystem.cpp; sourceTree = "<group>"; };
+		5FA2AC3A232A9AE0007A8482 /* journal.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = journal.hpp; sourceTree = "<group>"; };
+		5FA2AC3B232A9AE0007A8482 /* logger.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = logger.cpp; sourceTree = "<group>"; };
+		5FA2AC3C232A9AE0007A8482 /* main.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = main.cpp; sourceTree = "<group>"; };
+		5FA2AC3E232A9AE0007A8482 /* fsconfig.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = fsconfig.hpp; sourceTree = "<group>"; };
+		5FA2AC40232A9AE0007A8482 /* logger.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = logger.hpp; sourceTree = "<group>"; };
+		5FA2AC41232A9AE0007A8482 /* CMakeLists.txt */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = CMakeLists.txt; sourceTree = "<group>"; };
+		5FA2AC42232A9AE0007A8482 /* exception.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = exception.cpp; sourceTree = "<group>"; };
+		5FA2AC43232A9AE0007A8482 /* recoverylog.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = recoverylog.cpp; sourceTree = "<group>"; };
+		5FA2AC44232A9AE0007A8482 /* entity.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = entity.cpp; sourceTree = "<group>"; };
+		5FA2AC45232A9AE0007A8482 /* filesystem.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = filesystem.hpp; sourceTree = "<group>"; };
+		5FA2AC46232A9AE0007A8482 /* journal.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = journal.cpp; sourceTree = "<group>"; };
+		5FA2AC47232A9AE0007A8482 /* filesystem.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = filesystem.cpp; sourceTree = "<group>"; };
+		5FA2AC48232A9AE0007A8482 /* journal.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = journal.hpp; sourceTree = "<group>"; };
+		5FA2AC49232A9AE0007A8482 /* logger.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = logger.cpp; sourceTree = "<group>"; };
+		5FA2AC4A232A9AE0007A8482 /* exfat_structs.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = exfat_structs.hpp; sourceTree = "<group>"; };
+		5FA2AC4B232A9AE0007A8482 /* exception.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = exception.hpp; sourceTree = "<group>"; };
+		5FA2AC4C232A9AE0007A8482 /* entity.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = entity.hpp; sourceTree = "<group>"; };
+		5FA2AC4D232A9AE0007A8482 /* recoverylog.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = recoverylog.hpp; sourceTree = "<group>"; };
+		5FA2AC64232A9B23007A8482 /* CMakeLists.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = CMakeLists.txt; sourceTree = "<group>"; };
+		5FA2AC66232A9B23007A8482 /* CMakeLists.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = CMakeLists.txt; sourceTree = "<group>"; };
+		5FA2AC68232A9B23007A8482 /* CMakeLists.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = CMakeLists.txt; sourceTree = "<group>"; };
+		5FA2AC69232A9B23007A8482 /* main.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = main.cpp; sourceTree = "<group>"; };
+		5FA2AC6E232A9B6C007A8482 /* libtest */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = libtest; sourceTree = BUILT_PRODUCTS_DIR; };
+		5FA2AC7F232A9C14007A8482 /* resurrExorcist */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = resurrExorcist; sourceTree = BUILT_PRODUCTS_DIR; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		5FA2AC22232A9A71007A8482 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		5FA2AC6B232A9B6C007A8482 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				5FEB8392232A9E87007A8482 /* libresurrExion.dylib in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		5FA2AC7C232A9C14007A8482 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				5FEB8393232A9E8E007A8482 /* libresurrExion.dylib in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		5FA2AC1B232A9A71007A8482 = {
+			isa = PBXGroup;
+			children = (
+				5FA2AC63232A9B23007A8482 /* resurrEx */,
+				5FA2AC32232A9AE0007A8482 /* libresurrExion */,
+				5FA2AC25232A9A71007A8482 /* Products */,
+				5FEB8391232A9E87007A8482 /* Frameworks */,
+			);
+			sourceTree = "<group>";
+		};
+		5FA2AC25232A9A71007A8482 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				5FA2AC24232A9A71007A8482 /* libresurrExion.dylib */,
+				5FA2AC6E232A9B6C007A8482 /* libtest */,
+				5FA2AC7F232A9C14007A8482 /* resurrExorcist */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		5FA2AC32232A9AE0007A8482 /* libresurrExion */ = {
+			isa = PBXGroup;
+			children = (
+				5FA2AC33232A9AE0007A8482 /* CMakeLists.txt */,
+				5FA2AC3D232A9AE0007A8482 /* config */,
+				5FA2AC3F232A9AE0007A8482 /* src */,
+				5FA2AC34232A9AE0007A8482 /* test */,
+			);
+			path = libresurrExion;
+			sourceTree = "<group>";
+		};
+		5FA2AC34232A9AE0007A8482 /* test */ = {
+			isa = PBXGroup;
+			children = (
+				5FA2AC36232A9AE0007A8482 /* CMakeLists.txt */,
+				5FA2AC39232A9AE0007A8482 /* filesystem.cpp */,
+				5FA2AC37232A9AE0007A8482 /* filesystem.hpp */,
+				5FA2AC38232A9AE0007A8482 /* journal.cpp */,
+				5FA2AC3A232A9AE0007A8482 /* journal.hpp */,
+				5FA2AC3B232A9AE0007A8482 /* logger.cpp */,
+				5FA2AC35232A9AE0007A8482 /* logger.hpp */,
+				5FA2AC3C232A9AE0007A8482 /* main.cpp */,
+			);
+			path = test;
+			sourceTree = "<group>";
+		};
+		5FA2AC3D232A9AE0007A8482 /* config */ = {
+			isa = PBXGroup;
+			children = (
+				5FA2AC3E232A9AE0007A8482 /* fsconfig.hpp */,
+			);
+			path = config;
+			sourceTree = "<group>";
+		};
+		5FA2AC3F232A9AE0007A8482 /* src */ = {
+			isa = PBXGroup;
+			children = (
+				5FA2AC41232A9AE0007A8482 /* CMakeLists.txt */,
+				5FA2AC44232A9AE0007A8482 /* entity.cpp */,
+				5FA2AC4C232A9AE0007A8482 /* entity.hpp */,
+				5FA2AC42232A9AE0007A8482 /* exception.cpp */,
+				5FA2AC4B232A9AE0007A8482 /* exception.hpp */,
+				5FA2AC4A232A9AE0007A8482 /* exfat_structs.hpp */,
+				5FA2AC47232A9AE0007A8482 /* filesystem.cpp */,
+				5FA2AC45232A9AE0007A8482 /* filesystem.hpp */,
+				5FA2AC46232A9AE0007A8482 /* journal.cpp */,
+				5FA2AC48232A9AE0007A8482 /* journal.hpp */,
+				5FA2AC49232A9AE0007A8482 /* logger.cpp */,
+				5FA2AC40232A9AE0007A8482 /* logger.hpp */,
+				5FA2AC43232A9AE0007A8482 /* recoverylog.cpp */,
+				5FA2AC4D232A9AE0007A8482 /* recoverylog.hpp */,
+			);
+			path = src;
+			sourceTree = "<group>";
+		};
+		5FA2AC63232A9B23007A8482 /* resurrEx */ = {
+			isa = PBXGroup;
+			children = (
+				5FA2AC64232A9B23007A8482 /* CMakeLists.txt */,
+				5FA2AC65232A9B23007A8482 /* test */,
+				5FA2AC67232A9B23007A8482 /* src */,
+			);
+			path = resurrEx;
+			sourceTree = SOURCE_ROOT;
+		};
+		5FA2AC65232A9B23007A8482 /* test */ = {
+			isa = PBXGroup;
+			children = (
+				5FA2AC66232A9B23007A8482 /* CMakeLists.txt */,
+			);
+			path = test;
+			sourceTree = "<group>";
+		};
+		5FA2AC67232A9B23007A8482 /* src */ = {
+			isa = PBXGroup;
+			children = (
+				5FA2AC68232A9B23007A8482 /* CMakeLists.txt */,
+				5FA2AC69232A9B23007A8482 /* main.cpp */,
+			);
+			path = src;
+			sourceTree = "<group>";
+		};
+		5FEB8391232A9E87007A8482 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXHeadersBuildPhase section */
+		5FA2AC20232A9A71007A8482 /* Headers */ = {
+			isa = PBXHeadersBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				5FA2AC62232A9AE0007A8482 /* recoverylog.hpp in Headers */,
+				5FA2AC5F232A9AE0007A8482 /* exfat_structs.hpp in Headers */,
+				5FA2AC5A232A9AE0007A8482 /* filesystem.hpp in Headers */,
+				5FA2AC60232A9AE0007A8482 /* exception.hpp in Headers */,
+				5FA2AC56232A9AE0007A8482 /* logger.hpp in Headers */,
+				5FA2AC61232A9AE0007A8482 /* entity.hpp in Headers */,
+				5FA2AC5D232A9AE0007A8482 /* journal.hpp in Headers */,
+				5FA2AC4E232A9AE0007A8482 /* logger.hpp in Headers */,
+				5FA2AC55232A9AE0007A8482 /* fsconfig.hpp in Headers */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXHeadersBuildPhase section */
+
+/* Begin PBXNativeTarget section */
+		5FA2AC23232A9A71007A8482 /* resurrExion */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 5FA2AC2F232A9A71007A8482 /* Build configuration list for PBXNativeTarget "resurrExion" */;
+			buildPhases = (
+				5FA2AC20232A9A71007A8482 /* Headers */,
+				5FA2AC21232A9A71007A8482 /* Sources */,
+				5FA2AC22232A9A71007A8482 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = resurrExion;
+			productName = resurrExion;
+			productReference = 5FA2AC24232A9A71007A8482 /* libresurrExion.dylib */;
+			productType = "com.apple.product-type.library.dynamic";
+		};
+		5FA2AC6D232A9B6C007A8482 /* libtest */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 5FA2AC72232A9B6C007A8482 /* Build configuration list for PBXNativeTarget "libtest" */;
+			buildPhases = (
+				5FA2AC6A232A9B6C007A8482 /* Sources */,
+				5FA2AC6B232A9B6C007A8482 /* Frameworks */,
+				5FA2AC6C232A9B6C007A8482 /* CopyFiles */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				5FA2AC88232A9C40007A8482 /* PBXTargetDependency */,
+			);
+			name = libtest;
+			productName = libtest;
+			productReference = 5FA2AC6E232A9B6C007A8482 /* libtest */;
+			productType = "com.apple.product-type.tool";
+		};
+		5FA2AC7E232A9C14007A8482 /* resurrExorcist */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 5FA2AC83232A9C14007A8482 /* Build configuration list for PBXNativeTarget "resurrExorcist" */;
+			buildPhases = (
+				5FA2AC7B232A9C14007A8482 /* Sources */,
+				5FA2AC7C232A9C14007A8482 /* Frameworks */,
+				5FA2AC7D232A9C14007A8482 /* CopyFiles */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				5FA2AC8A232A9C4A007A8482 /* PBXTargetDependency */,
+			);
+			name = resurrExorcist;
+			productName = resurrExorcist;
+			productReference = 5FA2AC7F232A9C14007A8482 /* resurrExorcist */;
+			productType = "com.apple.product-type.tool";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		5FA2AC1C232A9A71007A8482 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				LastUpgradeCheck = 1030;
+				ORGANIZATIONNAME = paulyc;
+				TargetAttributes = {
+					5FA2AC23232A9A71007A8482 = {
+						CreatedOnToolsVersion = 10.3;
+					};
+					5FA2AC6D232A9B6C007A8482 = {
+						CreatedOnToolsVersion = 10.3;
+					};
+					5FA2AC7E232A9C14007A8482 = {
+						CreatedOnToolsVersion = 10.3;
+					};
+				};
+			};
+			buildConfigurationList = 5FA2AC1F232A9A71007A8482 /* Build configuration list for PBXProject "resurrExion" */;
+			compatibilityVersion = "Xcode 9.3";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+			);
+			mainGroup = 5FA2AC1B232A9A71007A8482;
+			productRefGroup = 5FA2AC25232A9A71007A8482 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				5FA2AC23232A9A71007A8482 /* resurrExion */,
+				5FA2AC6D232A9B6C007A8482 /* libtest */,
+				5FA2AC7E232A9C14007A8482 /* resurrExorcist */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXSourcesBuildPhase section */
+		5FA2AC21232A9A71007A8482 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				5FA2AC5B232A9AE0007A8482 /* journal.cpp in Sources */,
+				5FA2AC59232A9AE0007A8482 /* entity.cpp in Sources */,
+				5FA2AC5E232A9AE0007A8482 /* logger.cpp in Sources */,
+				5FA2AC57232A9AE0007A8482 /* exception.cpp in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		5FA2AC6A232A9B6C007A8482 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				5FA2AC77232A9BAA007A8482 /* main.cpp in Sources */,
+				5FA2AC75232A9B8F007A8482 /* filesystem.cpp in Sources */,
+				5FA2AC79232A9BC3007A8482 /* journal.cpp in Sources */,
+				5FA2AC7A232A9BDA007A8482 /* logger.cpp in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		5FA2AC7B232A9C14007A8482 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				5FA2AC86232A9C23007A8482 /* main.cpp in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		5FA2AC88232A9C40007A8482 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 5FA2AC23232A9A71007A8482 /* resurrExion */;
+			targetProxy = 5FA2AC87232A9C40007A8482 /* PBXContainerItemProxy */;
+		};
+		5FA2AC8A232A9C4A007A8482 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 5FA2AC23232A9A71007A8482 /* resurrExion */;
+			targetProxy = 5FA2AC89232A9C4A007A8482 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		5FA2AC2D232A9A71007A8482 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++17";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_IDENTITY = "Mac Developer";
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				HEADER_SEARCH_PATHS = /usr/local/include;
+				LIBRARY_SEARCH_PATHS = (
+					/usr/local/lib,
+					"$(PROJECT_DIR)/libresurrExion/src",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 10.14;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				OTHER_LDFLAGS = (
+					"-lboost_unit_test_framework",
+					"-lboost_program_options",
+				);
+				SDKROOT = macosx;
+			};
+			name = Debug;
+		};
+		5FA2AC2E232A9A71007A8482 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++17";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_IDENTITY = "Mac Developer";
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				HEADER_SEARCH_PATHS = /usr/local/include;
+				LIBRARY_SEARCH_PATHS = (
+					/usr/local/lib,
+					"$(PROJECT_DIR)/libresurrExion/src",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 10.14;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				OTHER_LDFLAGS = (
+					"-lboost_unit_test_framework",
+					"-lboost_program_options",
+				);
+				SDKROOT = macosx;
+			};
+			name = Release;
+		};
+		5FA2AC30232A9A71007A8482 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = 5CXXA9F47J;
+				DYLIB_COMPATIBILITY_VERSION = 1;
+				DYLIB_CURRENT_VERSION = 1;
+				EXECUTABLE_PREFIX = lib;
+				GCC_ENABLE_CPP_EXCEPTIONS = YES;
+				GCC_ENABLE_CPP_RTTI = YES;
+				GCC_SYMBOLS_PRIVATE_EXTERN = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+			};
+			name = Debug;
+		};
+		5FA2AC31232A9A71007A8482 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = 5CXXA9F47J;
+				DYLIB_COMPATIBILITY_VERSION = 1;
+				DYLIB_CURRENT_VERSION = 1;
+				EXECUTABLE_PREFIX = lib;
+				GCC_ENABLE_CPP_EXCEPTIONS = YES;
+				GCC_ENABLE_CPP_RTTI = YES;
+				GCC_SYMBOLS_PRIVATE_EXTERN = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+			};
+			name = Release;
+		};
+		5FA2AC73232A9B6C007A8482 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = 5CXXA9F47J;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+			};
+			name = Debug;
+		};
+		5FA2AC74232A9B6C007A8482 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = 5CXXA9F47J;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+			};
+			name = Release;
+		};
+		5FA2AC84232A9C14007A8482 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = 5CXXA9F47J;
+				HEADER_SEARCH_PATHS = (
+					/usr/local/include,
+					"$(PROJECT_DIR)/libresurrExion/src",
+				);
+				PRODUCT_NAME = "$(TARGET_NAME)";
+			};
+			name = Debug;
+		};
+		5FA2AC85232A9C14007A8482 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = 5CXXA9F47J;
+				HEADER_SEARCH_PATHS = (
+					/usr/local/include,
+					"$(PROJECT_DIR)/libresurrExion/src",
+				);
+				PRODUCT_NAME = "$(TARGET_NAME)";
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		5FA2AC1F232A9A71007A8482 /* Build configuration list for PBXProject "resurrExion" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				5FA2AC2D232A9A71007A8482 /* Debug */,
+				5FA2AC2E232A9A71007A8482 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		5FA2AC2F232A9A71007A8482 /* Build configuration list for PBXNativeTarget "resurrExion" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				5FA2AC30232A9A71007A8482 /* Debug */,
+				5FA2AC31232A9A71007A8482 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		5FA2AC72232A9B6C007A8482 /* Build configuration list for PBXNativeTarget "libtest" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				5FA2AC73232A9B6C007A8482 /* Debug */,
+				5FA2AC74232A9B6C007A8482 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		5FA2AC83232A9C14007A8482 /* Build configuration list for PBXNativeTarget "resurrExorcist" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				5FA2AC84232A9C14007A8482 /* Debug */,
+				5FA2AC85232A9C14007A8482 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 5FA2AC1C232A9A71007A8482 /* Project object */;
+}
