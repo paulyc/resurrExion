@@ -87,6 +87,23 @@ ExFATFilesystem<SectorSize, SectorsPerCluster, NumSectors>::~ExFATFilesystem()
 }
 
 template <size_t SectorSize, size_t SectorsPerCluster, size_t NumSectors>
+void ExFATFilesystem<SectorSize, SectorsPerCluster, NumSectors>::scanWriteToLog() {
+    uint8_t *end = _partition_end - sizeof(exfat::file_directory_entry_t);
+    for (uint8_t *peek = _partition_start; peek < end; ++peek) {
+        if (*peek == exfat::FILE_DIR_ENTRY) {
+            exfat::file_directory_entry_t *fde = (exfat::file_directory_entry_t*)(peek);
+            exfat::stream_extension_entry_t *m2 = (exfat::stream_extension_entry_t *)(peek+32);
+            if (fde->isValid() && m2->isValid()) {
+                if (fde->calc_set_checksum() == fde->checksum) {
+                    printf("FDE %016zull\n", peek-1);
+                }
+
+            }
+        }
+    }
+}
+
+template <size_t SectorSize, size_t SectorsPerCluster, size_t NumSectors>
 void
 ExFATFilesystem<SectorSize, SectorsPerCluster, NumSectors>::loadDirectory(std::shared_ptr<DirectoryEntity> de)
 {
@@ -212,7 +229,7 @@ void ExFATFilesystem<SectorSize, SectorsPerCluster, NumSectors>::init_metadata()
         (sizeof(exfat::boot_region_t<SectorSize>) +
          sizeof(exfat::root_directory_t<SectorSize, SectorsPerCluster>)) / SectorSize;
     _boot_region.vbr.cluster_count = cluster_count;
-    _boot_region.vbr.root_directory_cluster = 0;
+    _boot_region.vbr.root_directory_cluster = 3;
        // sizeof(fs_volume_metadata <SectorSize, SectorsPerCluster, NumSectors>) / (SectorSize * ClustersPerSector);// ???
     _boot_region.vbr.volume_serial_number = 0xDEADBEEF;
     _boot_region.vbr.volume_flags = exfat::VOLUME_DIRTY;
@@ -236,6 +253,7 @@ void ExFATFilesystem<SectorSize, SectorsPerCluster, NumSectors>::init_metadata()
 	_allocation_bitmap.mark_all_alloc();
     _root_directory.bitmap_entry.data_length = sizeof(_allocation_bitmap.bitmap);
     _root_directory.bitmap_entry.first_cluster = 2;
+    _root_directory.bitmap_entry = _allocation_bitmap.get_entry();
 
 	exfat::upcase_table_entry_t       upcase_entry;
     _root_directory.upcase_entry.calc_checksum((const uint8_t*)&_upcase_table, sizeof(_upcase_table));
