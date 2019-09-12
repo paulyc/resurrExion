@@ -243,14 +243,15 @@ void ExFATFilesystem<SectorSize, SectorsPerCluster, NumSectors>::init_metadata()
     _root_directory.upcase_entry.data_length = sizeof(_upcase_table);
     _root_directory.upcase_entry.first_cluster = 3;
 
-//    fs_volume_guid_entry        guid_entry;
+	//exfat::fs_volume_guid_entry        guid_entry;
     // some random number I made up
     const uint8_t guid[] = {
         0x16, 0x06, 0x7e, 0xa1, 0x85, 0x3d, 0xf9, 0x25,
         0x93, 0xda, 0x7d, 0x5c, 0xe9, 0xf1, 0xb9, 0x9d
     };
     memcpy(_root_directory.guid_entry.volume_guid, guid, sizeof(guid));
-    _root_directory.guid_entry.set_checksum;
+	_root_directory.guid_entry.calc_checksum();
+	//_root_directory
 //    fs_file_directory_entry     directory_entry;
 //    fs_stream_extension_entry   ext_entry;
 //    fs_file_name_entry          name_entry;

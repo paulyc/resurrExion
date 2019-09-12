@@ -265,40 +265,54 @@ struct allocation_bitmap_entry_t {
 };
 
 struct volume_guid_entry_t {
-	/*void calc_checksum(const uint8_t *data, size_t bytes) {
-		set_checksum = 0;
-		for (size_t i = 0; i < bytes; i++) {
-			set_checksum = (set_checksum << 31) | (set_checksum >> 1) + data[i];
+	constexpr volume_guid_entry_t(const uint8_t guid[16]) {
+		for (size_t i = 0; i < 16; ++i) {
+			volume_guid[i] = guid[i];
 		}
-	}*/
+		this->set_checksum = this->calc_checksum();
+	}
+
+	// got to check this algo
+	constexpr uint16_t calc_checksum() const {
+		const uint8_t *data = (const uint8_t *)this;
+		uint16_t set_checksum = 0;
+		for (size_t i = 0; i < sizeof(struct volume_guid_entry_t); i++) {
+			if (i != 2 && i != 3) {
+				set_checksum = (set_checksum << 31) | (set_checksum >> 1) + data[i];
+			}
+		}
+		return set_checksum;
+	}
+
     uint8_t  type               = VOLUME_GUID; // 0xA0
     uint8_t  secondary_count    = 0;
-    uint16_t set_checksum;
-    uint16_t flags              = 0;    // combination of VolumeGuidFlags, must be 0
-    uint8_t  volume_guid[16];           // must not be null
+	uint16_t set_checksum       = 0;
+    uint16_t flags              = 0;           // combination of VolumeGuidFlags, must be 0
+	uint8_t  volume_guid[16]    = {0};         // must not be null
     uint8_t  reserved[10]       = {0};
 };
 
 struct volume_label_entry_t {
     static constexpr size_t VOLUME_LABEL_MAX_LENGTH = 11;
-    volume_label_entry_t() {}
-    volume_label_entry_t(std::basic_string<char16_t> volume_label_utf16) { set_label(volume_label_utf16); }
+    constexpr volume_label_entry_t() {}
+    constexpr volume_label_entry_t(const std::basic_string<char16_t> &volume_label_utf16) { set_label(volume_label_utf16); }
 
-    void set_label(std::basic_string<char16_t> volume_label_utf16) {
+    void set_label(const std::basic_string<char16_t> &volume_label_utf16) {
         character_count = std::min(VOLUME_LABEL_MAX_LENGTH, volume_label_utf16.length());
         memcpy(volume_label, volume_label_utf16.data(), sizeof(char16_t) * character_count);
     }
 
-    uint8_t type                = VOLUME_LABEL; // 0x83 if volume label exists or 0x03 if it was deleted
-    uint8_t character_count     = 0;            // characters in label
-    uint16_t volume_label[VOLUME_LABEL_MAX_LENGTH]   = {0};
-    uint8_t reserved[8]         = {0};
+    uint8_t type                                    = VOLUME_LABEL; // 0x83 if volume label exists or 0x03 if it was deleted
+    uint8_t character_count                         = 0;            // characters in label
+    uint16_t volume_label[VOLUME_LABEL_MAX_LENGTH]  = {0};
+    uint8_t reserved[8]                             = {0};
 };
 
 struct upcase_table_entry_t {
     void calc_checksum(const uint8_t *data, size_t bytes) {
         checksum = 0;
         for (size_t i = 0; i < bytes; i++) {
+			//?if (i != )
             checksum = (checksum << 31) | (checksum >> 1) + data[i];
         }
     }
@@ -334,6 +348,10 @@ struct allocation_bitmap_table_t
 	uint8_t bitmap[BitmapSize] = {0};
 	uint8_t padding[PaddingSize] = {0};
 
+	constexpr allocation_bitmap_table_t() {
+		mark_all_alloc();
+	}
+
 	void mark_all_alloc() {
 		for (size_t i = 0; i < BitmapSize; ++i) {
 			bitmap[i] = 0xFF;
@@ -345,9 +363,9 @@ struct allocation_bitmap_table_t
 
 template <int SectorSize, int NumEntries>
 struct upcase_table_t {
-    upcase_table_t() {
-        unsigned i;
-        for (i = 0; i < 0x61; ++i) {
+    constexpr upcase_table_t() {
+		unsigned i = 0;
+        for (; i < 0x61; ++i) {
             entries[i] = i;
         }
         for (; i <= 0x7B; ++i) {
