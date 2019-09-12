@@ -87,7 +87,7 @@ private:
     // not part of actual partition, to be copied over later after being initialized
     exfat::boot_region_t<SectorSize> _boot_region;
     exfat::file_allocation_table_t<SectorSize, SectorsPerCluster, ClustersInFat> _fat;
-    exfat::allocation_bitmap_table_t<SectorSize, SectorsPerCluster, ClustersInFat> _allocation_bitmap;
+    exfat::allocation_bitmap_table_t<SectorSize, ClustersInFat> _allocation_bitmap;
     exfat::upcase_table_t<SectorSize, 256> _upcase_table;
     exfat::root_directory_t<SectorSize, SectorsPerCluster> _root_directory;
 

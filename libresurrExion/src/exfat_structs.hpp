@@ -98,9 +98,9 @@ struct volume_boot_record_t {
     uint8_t  reserved[7]                = {0};
     uint8_t  boot_code[390]             = {0};
     uint16_t boot_signature             = 0xAA55;
-    //uint8_t  padding[SectorSize - 512] ;        // Padded out to sector size
+	//uint8_t  padding[SectorSize - 512];        // Padded out to sector size
 } __attribute__((packed));
-//static_assert(sizeof(volume_boot_record<512>) == 512);
+static_assert(sizeof(volume_boot_record_t<512>) == 512);
 
 // for a 512-byte sector. should be same size as a sector
 template <size_t SectorSize>
@@ -129,7 +129,7 @@ struct oem_parameters_t {
     uint8_t parameters7[48]             = {0};
     uint8_t parameters8[48]             = {0};
     uint8_t parameters9[48]             = {0};
-    uint8_t reserved[SectorSize - 480]  = {0}; // 32-3616 bytes padded out to sector size
+    uint8_t reserved[SectorSize - 48*10]= {0}; // 32-3616 bytes padded out to sector size
 };
 static_assert(sizeof(oem_parameters_t<512>) == 512);
 
@@ -265,10 +265,16 @@ struct allocation_bitmap_entry_t {
 };
 
 struct volume_guid_entry_t {
+	/*void calc_checksum(const uint8_t *data, size_t bytes) {
+		set_checksum = 0;
+		for (size_t i = 0; i < bytes; i++) {
+			set_checksum = (set_checksum << 31) | (set_checksum >> 1) + data[i];
+		}
+	}*/
     uint8_t  type               = VOLUME_GUID; // 0xA0
     uint8_t  secondary_count    = 0;
     uint16_t set_checksum;
-    uint16_t flags              = 0;    // combination of fs_volume_guid_flags, must be 0
+    uint16_t flags              = 0;    // combination of VolumeGuidFlags, must be 0
     uint8_t  volume_guid[16];           // must not be null
     uint8_t  reserved[10]       = {0};
 };
@@ -304,6 +310,7 @@ struct upcase_table_entry_t {
     uint64_t data_length;
 };
 
+
 union metadata_entry_u {
     raw_entry_t raw;
     file_directory_entry_t file_directory_entry;
@@ -318,15 +325,23 @@ union metadata_entry_u {
 };
 static_assert(sizeof(metadata_entry_u) == 32);
 
-template <size_t SectorSize, size_t SectorsPerCluster, size_t NumSectors>
+template <size_t SectorSize, size_t NumClusters>
 struct allocation_bitmap_table_t
 {
-    static constexpr size_t NumClusters = NumSectors / SectorsPerCluster;
     static constexpr size_t BitmapSize = (NumClusters / 8) + ((NumClusters % 8) == 0 ? 0 : 1);
     static constexpr size_t PaddingSize = SectorSize - (BitmapSize % SectorSize);
 
-    uint8_t bitmap[BitmapSize];
+	uint8_t bitmap[BitmapSize] = {0};
+	uint8_t padding[PaddingSize] = {0};
+
+	void mark_all_alloc() {
+		for (size_t i = 0; i < BitmapSize; ++i) {
+			bitmap[i] = 0xFF;
+		}
+	}
 };
+// idk what this is supposed to check!
+//  static_assert(sizeof(allocation_bitmap_table_t<512, >::bitmap) == 29806);
 
 template <int SectorSize, int NumEntries>
 struct upcase_table_t {

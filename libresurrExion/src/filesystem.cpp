@@ -212,7 +212,7 @@ void ExFATFilesystem<SectorSize, SectorsPerCluster, NumSectors>::init_metadata()
         (sizeof(exfat::boot_region_t<SectorSize>) +
          sizeof(exfat::root_directory_t<SectorSize, SectorsPerCluster>)) / SectorSize;
     _boot_region.vbr.cluster_count = cluster_count;
-    //TODO _boot_region.vbr.root_directory_cluster = 0;
+    _boot_region.vbr.root_directory_cluster = 0;
        // sizeof(fs_volume_metadata <SectorSize, SectorsPerCluster, NumSectors>) / (SectorSize * ClustersPerSector);// ???
     _boot_region.vbr.volume_serial_number = 0xDEADBEEF;
     _boot_region.vbr.volume_flags = exfat::VOLUME_DIRTY;
@@ -231,18 +231,17 @@ void ExFATFilesystem<SectorSize, SectorsPerCluster, NumSectors>::init_metadata()
 
     _root_directory.label_entry.set_label(_cvt.from_bytes("Elements"));
 
-    // fs_allocation_bitmap_entry  bitmap_entry;
     // create allocation bitmap, just set every cluster allocated so we don't overwrite anything
     // after mounting the filesystem
-    memset(_allocation_bitmap.bitmap, 0xFF, sizeof(_allocation_bitmap.bitmap));
+	_allocation_bitmap.mark_all_alloc();
     _root_directory.bitmap_entry.data_length = sizeof(_allocation_bitmap.bitmap);
-    //TBD _root_directory.bitmap_entry.first_cluster;
+    _root_directory.bitmap_entry.first_cluster = 2;
 
-    // fs_upcase_table_entry       upcase_entry;
+	exfat::upcase_table_entry_t       upcase_entry;
     _root_directory.upcase_entry.calc_checksum((const uint8_t*)&_upcase_table, sizeof(_upcase_table));
 
     _root_directory.upcase_entry.data_length = sizeof(_upcase_table);
-    //TODO _root_directory.upcase_entry.first_cluster;
+    _root_directory.upcase_entry.first_cluster = 3;
 
 //    fs_volume_guid_entry        guid_entry;
     // some random number I made up
@@ -251,7 +250,7 @@ void ExFATFilesystem<SectorSize, SectorsPerCluster, NumSectors>::init_metadata()
         0x93, 0xda, 0x7d, 0x5c, 0xe9, 0xf1, 0xb9, 0x9d
     };
     memcpy(_root_directory.guid_entry.volume_guid, guid, sizeof(guid));
-    //TODO_root_directory.guid_entry.set_checksum;
+    _root_directory.guid_entry.set_checksum;
 //    fs_file_directory_entry     directory_entry;
 //    fs_stream_extension_entry   ext_entry;
 //    fs_file_name_entry          name_entry;
