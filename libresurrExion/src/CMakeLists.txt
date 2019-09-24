@@ -31,6 +31,7 @@ set(LIB_HEADERS
 	journal.hpp
 	logger.hpp
 	recoverylog.hpp
+        circbuf.hpp
 )
 
 set(LIB_COMPILE_SOURCES
@@ -38,6 +39,7 @@ set(LIB_COMPILE_SOURCES
 	exception.cpp
 	journal.cpp
 	logger.cpp
+        circbuf.cpp
 )
 
 set(LIB_NO_COMPILE_SOURCES

@@ -87,6 +87,26 @@ ExFATFilesystem<SectorSize, SectorsPerCluster, NumSectors>::~ExFATFilesystem()
 }
 
 template <size_t SectorSize, size_t SectorsPerCluster, size_t NumSectors>
+void ExFATFilesystem<SectorSize, SectorsPerCluster, NumSectors>::scanWriteToLog() {
+
+    uint8_t *end = _partition_end - sizeof(exfat::file_directory_entry_t);
+    for (uint8_t *peek = _partition_start; peek < end; ++peek) {
+        if (*peek == exfat::FILE_DIR_ENTRY) {
+            exfat::file_directory_entry_t *fde = (exfat::file_directory_entry_t*)(peek);
+            exfat::stream_extension_entry_t *m2 = (exfat::stream_extension_entry_t *)(peek+32);
+            if (fde->isValid() && m2->isValid()) {
+                if (fde->calc_set_checksum() == fde->checksum) {
+                    printf("FDE %016zull\n", peek-1);
+                }
+
+            }
+        }
+    }
+    uint8_t *read = _partition_start;
+
+}
+
+template <size_t SectorSize, size_t SectorsPerCluster, size_t NumSectors>
 void
 ExFATFilesystem<SectorSize, SectorsPerCluster, NumSectors>::loadDirectory(std::shared_ptr<DirectoryEntity> de)
 {

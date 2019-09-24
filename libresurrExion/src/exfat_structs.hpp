@@ -202,7 +202,7 @@ struct raw_entry_t {
 
 struct file_directory_entry_t {
     uint8_t  type               = FILE_DIR_ENTRY;   // FILE_DIR_ENTRY = 0x85
-    uint8_t  continuations;
+    uint8_t  continuations; // between 2 and 18
     uint16_t checksum;
     uint16_t attributes;
     uint8_t  reserved0[2]       = {0};
@@ -216,6 +216,46 @@ struct file_directory_entry_t {
     uint8_t  modified_time_cs;
     uint8_t  accessed_time_cs;
     uint8_t  reserved1[9]       = {0};
+
+    bool isValid() {
+        if (type != FILE_DIR_ENTRY) return false;
+        if (continuations < 2 || continuations > 18) return false;
+        return true;
+    }
+    /*
+     * UInt16	EntrySetChecksum
+(
+    UCHAR *	Entries,		// points to an in-memory copy of the directory entry set
+       UCHAR	SecondaryCount
+)
+{
+       UInt16	NumberOfBytes =	((UInt16)SecondaryCount + 1) * 32;
+    UInt16	Checksum =		0;
+    UInt16	Index;
+
+       for (Index = 0; Index < NumberOfBytes; Index++)
+    {
+            if ((Index == 2) || (Index == 3))
+              {
+                    continue;
+            }
+            Checksum = ((Checksum&1) ? 0x8000 : 0) + (Checksum>>1) + (UInt16)Entries[Index];
+       }
+
+       return Checksum;
+}*/
+    uint16_t calc_set_checksum() {
+         int i, file_info_size = (continuations + 1) * 32;
+         uint8_t *bufp = (uint8_t*)this;
+         uint16_t chksum = 0;
+
+         for (i = 0; i < file_info_size; ++i) {
+             if (i != 2 && i != 3) {
+                chksum = (((chksum << 15) & 0x8000) | (chksum >> 1)) + (uint16_t)bufp[i];
+            }
+        }
+         return chksum;
+    }
 };
 
 struct primary_directory_entry_t {
@@ -247,6 +287,10 @@ struct stream_extension_entry_t {
     uint32_t reserved2      = 0;
     uint32_t first_cluster;
     uint64_t size;
+    bool isValid() {
+        if (type != STREAM_EXTENSION) return false;
+        return true;
+    }
 };
 
 struct file_name_entry_t {
