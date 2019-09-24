@@ -265,6 +265,12 @@ struct allocation_bitmap_entry_t {
 };
 
 struct volume_guid_entry_t {
+    constexpr volume_guid_entry_t() {
+        for (size_t i = 0; i < 16; ++i) {
+            volume_guid[i] = 0;
+        }
+        this->set_checksum = this->calc_checksum();
+    }
 	constexpr volume_guid_entry_t(const uint8_t guid[16]) {
 		for (size_t i = 0; i < 16; ++i) {
 			volume_guid[i] = guid[i];
@@ -328,7 +334,7 @@ struct upcase_table_entry_t {
 union metadata_entry_u {
     raw_entry_t raw;
     file_directory_entry_t file_directory_entry;
-    primary_directory_entry_t primary_directory_entry_t;
+    primary_directory_entry_t primary_directory_entry;
     secondary_directory_entry_t secondary_directory_entry;
     stream_extension_entry_t stream_extension_entry;
     file_name_entry_t file_name_entry;
