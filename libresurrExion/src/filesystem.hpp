@@ -53,28 +53,6 @@ constexpr int exfat_filename_maxlen_utf8 = exfat_filename_maxlen * 2;
 
 static constexpr int32_t BadSectorFlag = -1;
 
-static std::string _get_utf8_filename(exfat::file_directory_entry_t *fde, struct exfat::stream_extension_entry_t *sde)
-    {
-        static std::wstring_convert<std::codecvt_utf8_utf16<char16_t>, char16_t> _cvt;
-
-        const int continuations = fde->continuations;
-        const int namelen = sde->name_length;
-        std::basic_string<char16_t> u16s;
-        for (int c = 2; c <= continuations; ++c) {
-            exfat::file_name_entry_t *n = (exfat::file_name_entry_t *)(((uint8_t*)fde) + c*32);
-            if (n->type == exfat::FILE_NAME) {
-                for (int i = 0; i < sizeof(n->name); ++i) {
-                    if (u16s.length() == namelen) {
-                        return _cvt.to_bytes(u16s);
-                    } else {
-                        u16s.push_back((char16_t)n->name[i]);
-                    }
-                }
-            }
-        }
-        return _cvt.to_bytes(u16s);
-    }
-
 class BaseEntity;
 
 template <size_t SectorSize, size_t SectorsPerCluster, size_t NumSectors>
@@ -128,6 +106,27 @@ private:
     std::wstring_convert<std::codecvt_utf8_utf16<char16_t>, char16_t> _cvt;
 
     std::vector<char16_t> _invalid_file_name_characters;
+
+    static std::string _get_utf8_filename(exfat::file_directory_entry_t *fde, struct exfat::stream_extension_entry_t *sde)
+    {
+        const int continuations = fde->continuations;
+        const int namelen = sde->name_length;
+        std::basic_string<char16_t> u16s;
+        for (int c = 2; c <= continuations; ++c) {
+            exfat::file_name_entry_t *n = (exfat::file_name_entry_t *)(((uint8_t*)fde) + c*32);
+            if (n->type == exfat::FILE_NAME) {
+                for (int i = 0; i < sizeof(n->name); ++i) {
+                    if (u16s.length() == namelen) {
+                        return _cvt.to_bytes(u16s);
+                    } else {
+                        u16s.push_back((char16_t)n->name[i]);
+                    }
+                }
+            }
+        }
+        return _cvt.to_bytes(u16s);
+    }
+    std::wstring_convert<std::codecvt_utf8_utf16<char16_t>, char16_t> _cvt;
 };
 
 } /* namespace resurrExion */

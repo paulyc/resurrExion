@@ -88,7 +88,6 @@ ExFATFilesystem<SectorSize, SectorsPerCluster, NumSectors>::~ExFATFilesystem()
 
 template <size_t SectorSize, size_t SectorsPerCluster, size_t NumSectors>
 void ExFATFilesystem<SectorSize, SectorsPerCluster, NumSectors>::scanWriteToLog() {
-
     uint8_t *end = _partition_end - sizeof(exfat::file_directory_entry_t);
     for (uint8_t *peek = _partition_start; peek < end; ++peek) {
         if (*peek == exfat::FILE_DIR_ENTRY) {
@@ -102,8 +101,6 @@ void ExFATFilesystem<SectorSize, SectorsPerCluster, NumSectors>::scanWriteToLog(
             }
         }
     }
-    uint8_t *read = _partition_start;
-
 }
 
 template <size_t SectorSize, size_t SectorsPerCluster, size_t NumSectors>
