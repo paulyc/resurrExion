@@ -304,8 +304,9 @@ struct allocation_bitmap_entry_t {
     uint8_t type            = ALLOCATION_BITMAP;
     uint8_t bitmap_flags    = 0; // 0 if first allocation bitmap, 1 if second (TexFAT only)
     uint8_t reserved[18]    = {0};
-    uint32_t first_cluster; // First data cluster number
+    uint32_t first_cluster  = 1; // First data cluster number
     uint64_t data_length;   // Size of allocation bitmap in bytes. Ceil(ClusterCount / 8)
+
 };
 
 struct volume_guid_entry_t {
@@ -359,18 +360,21 @@ struct volume_label_entry_t {
 };
 
 struct upcase_table_entry_t {
-    void calc_checksum(const uint8_t *data, size_t bytes) {
+    /*constexpr void calc_checksum(const uint8_t *data, size_t bytes) {
         checksum = 0;
         for (size_t i = 0; i < bytes; i++) {
 			//?if (i != )
             checksum = (checksum << 31) | (checksum >> 1) + data[i];
         }
     }
+    constexpr upcase_table_entry_t() {
+
+    }*/
     uint8_t  type           = UPCASE_TABLE; // 0x82
     uint8_t  reserved0[3]   = {0};
     uint32_t checksum;
     uint8_t  reserved1[12]  = {0};
-    uint32_t first_cluster;
+    uint32_t first_cluster  = 2;
     uint64_t data_length;
 };
 
@@ -407,6 +411,12 @@ struct allocation_bitmap_table_t
 			bitmap[i] = 0xFF;
 		}
 	}
+
+    constexpr allocation_bitmap_entry_t get_directory_entry() const {
+        return allocation_bitmap_entry_t {
+            .data_length = sizeof(*this)
+        };
+    }
 };
 // idk what this is supposed to check!
 //  static_assert(sizeof(allocation_bitmap_table_t<512, >::bitmap) == 29806);
@@ -434,6 +444,17 @@ struct upcase_table_t {
         }
     }
     char16_t entries[NumEntries];
+
+    constexpr upcase_table_entry_t get_directory_entry() const {
+        uint32_t chksum = 0;
+        const uint8_t *data = (const uint8_t*)entries;
+        for (size_t i = 0; i < sizeof(char16_t) * NumEntries; ++i) {
+            chksum = (chksum<<31) + (chksum >> 1) + (uint32_t)data[i];
+        }
+        return upcase_table_entry_t {
+
+        };
+    }
 } __attribute__((packed));
 
 template <size_t SectorSize>
@@ -509,13 +530,14 @@ struct directory_t
         const uint8_t *data = (const uint8_t*)&primary_entry;
         for (int i = 0; i < sizeof(primary_directory_entry_t); ++i) {
             if (i != 2 && i != 3) {
-                chksum = ((chksum << 31) | (chksum >> 1)) + data[i];
+                //Checksum = ((Checksum&1) ? 0x8000 : 0) + (Checksum>>1) + (UInt16)Entries[Index];
+                chksum = ((chksum << 15) | (chksum >> 1)) + data[i];
             }
         }
         for (size_t sec_entry = 0; sec_entry < secondary_count; ++sec_entry) {
             data = (const uint8_t*)(secondary_entries + sec_entry);
             for (int i = 0; i < sizeof(secondary_directory_entry_t); ++i) {
-                chksum = ((chksum << 31) | (chksum >> 1)) + data[i];
+                chksum = ((chksum << 15) | (chksum >> 1)) + data[i];
             }
         }
     }
@@ -550,6 +572,7 @@ struct data_region_t {
 
 template <size_t SectorSize, size_t SectorsPerCluster, size_t NumSectors>
 struct filesystem_t {
+    constexpr static size_t ClusterSize = SectorSize * SectorsPerCluster;
     constexpr static size_t ClustersInFat = (NumSectors - 0x283D8) / 512;
     boot_region_t<SectorSize>                                                  main_boot_region;
     // copy of main_boot_region

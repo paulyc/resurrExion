@@ -232,7 +232,7 @@ void ExFATFilesystem<SectorSize, SectorsPerCluster, NumSectors>::init_metadata()
         (sizeof(exfat::boot_region_t<SectorSize>) +
          sizeof(exfat::root_directory_t<SectorSize, SectorsPerCluster>)) / SectorSize;
     _boot_region.vbr.cluster_count = cluster_count;
-    _boot_region.vbr.root_directory_cluster = 0;
+    _boot_region.vbr.root_directory_cluster = 3;
        // sizeof(fs_volume_metadata <SectorSize, SectorsPerCluster, NumSectors>) / (SectorSize * ClustersPerSector);// ???
     _boot_region.vbr.volume_serial_number = 0xDEADBEEF;
     _boot_region.vbr.volume_flags = exfat::VOLUME_DIRTY;
@@ -254,14 +254,14 @@ void ExFATFilesystem<SectorSize, SectorsPerCluster, NumSectors>::init_metadata()
     // create allocation bitmap, just set every cluster allocated so we don't overwrite anything
     // after mounting the filesystem
 	_allocation_bitmap.mark_all_alloc();
-    _root_directory.bitmap_entry.data_length = sizeof(_allocation_bitmap.bitmap);
-    _root_directory.bitmap_entry.first_cluster = 2;
+//.first_cluster = 2
+    _root_directory.bitmap_entry = _allocation_bitmap.get_entry();
 
 	exfat::upcase_table_entry_t       upcase_entry;
     _root_directory.upcase_entry.calc_checksum((const uint8_t*)&_upcase_table, sizeof(_upcase_table));
 
     _root_directory.upcase_entry.data_length = sizeof(_upcase_table);
-    _root_directory.upcase_entry.first_cluster = 3;
+    _root_directory.upcase_entry.first_cluster = 2 + 1;
 
 	//exfat::fs_volume_guid_entry        guid_entry;
     // some random number I made up
