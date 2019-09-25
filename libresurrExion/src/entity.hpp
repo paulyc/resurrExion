@@ -41,7 +41,14 @@ namespace resurrExion {
 class BaseEntity
 {
 public:
-    BaseEntity(void *entry_start, uint8_t num_entries, std::shared_ptr<BaseEntity> parent, const std::string &name);
+    BaseEntity(void *entry_start, uint8_t num_entries, std::shared_ptr<BaseEntity> parent, const std::string &name) :
+        _fs_entries((exfat::metadata_entry_u*)entry_start),
+        _num_entries(num_entries),
+        _parent(parent),
+        _name(name)
+    {
+    }
+
     ~BaseEntity() = default;
 
     exfat::metadata_entry_u *get_entity_start() const {
@@ -89,7 +96,14 @@ public:
 class DirectoryEntity : public BaseEntity
 {
 public:
-    DirectoryEntity(void *entry_start, int num_entries, std::shared_ptr<BaseEntity> parent, const std::string &name);
+    DirectoryEntity(
+        void *entry_start,
+        int num_entries,
+        std::shared_ptr<BaseEntity> parent,
+        const std::string &name) :
+        BaseEntity(entry_start, num_entries, parent, name)
+    {
+    }
 
     void add_child(std::shared_ptr<BaseEntity> child) { _children.push_back(child); }
     const std::list<std::shared_ptr<BaseEntity>> &get_children() const { return _children; }

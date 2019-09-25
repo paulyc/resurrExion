@@ -11,7 +11,6 @@
 		5FA2AC55232A9AE0007A8482 /* fsconfig.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 5FA2AC3E232A9AE0007A8482 /* fsconfig.hpp */; };
 		5FA2AC56232A9AE0007A8482 /* logger.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 5FA2AC40232A9AE0007A8482 /* logger.hpp */; };
 		5FA2AC57232A9AE0007A8482 /* exception.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 5FA2AC42232A9AE0007A8482 /* exception.cpp */; };
-		5FA2AC59232A9AE0007A8482 /* entity.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 5FA2AC44232A9AE0007A8482 /* entity.cpp */; };
 		5FA2AC5A232A9AE0007A8482 /* filesystem.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 5FA2AC45232A9AE0007A8482 /* filesystem.hpp */; };
 		5FA2AC5B232A9AE0007A8482 /* journal.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 5FA2AC46232A9AE0007A8482 /* journal.cpp */; };
 		5FA2AC5D232A9AE0007A8482 /* journal.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 5FA2AC48232A9AE0007A8482 /* journal.hpp */; };
@@ -82,11 +81,8 @@
 		5FA2AC40232A9AE0007A8482 /* logger.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = logger.hpp; sourceTree = "<group>"; };
 		5FA2AC41232A9AE0007A8482 /* CMakeLists.txt */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = CMakeLists.txt; sourceTree = "<group>"; };
 		5FA2AC42232A9AE0007A8482 /* exception.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = exception.cpp; sourceTree = "<group>"; };
-		5FA2AC43232A9AE0007A8482 /* recoverylog.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = recoverylog.cpp; sourceTree = "<group>"; };
-		5FA2AC44232A9AE0007A8482 /* entity.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = entity.cpp; sourceTree = "<group>"; };
 		5FA2AC45232A9AE0007A8482 /* filesystem.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = filesystem.hpp; sourceTree = "<group>"; };
 		5FA2AC46232A9AE0007A8482 /* journal.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = journal.cpp; sourceTree = "<group>"; };
-		5FA2AC47232A9AE0007A8482 /* filesystem.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = filesystem.cpp; sourceTree = "<group>"; };
 		5FA2AC48232A9AE0007A8482 /* journal.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = journal.hpp; sourceTree = "<group>"; };
 		5FA2AC49232A9AE0007A8482 /* logger.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = logger.cpp; sourceTree = "<group>"; };
 		5FA2AC4A232A9AE0007A8482 /* exfat_structs.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = exfat_structs.hpp; sourceTree = "<group>"; };
@@ -186,18 +182,15 @@
 			isa = PBXGroup;
 			children = (
 				5FA2AC41232A9AE0007A8482 /* CMakeLists.txt */,
-				5FA2AC44232A9AE0007A8482 /* entity.cpp */,
 				5FA2AC4C232A9AE0007A8482 /* entity.hpp */,
 				5FA2AC42232A9AE0007A8482 /* exception.cpp */,
 				5FA2AC4B232A9AE0007A8482 /* exception.hpp */,
 				5FA2AC4A232A9AE0007A8482 /* exfat_structs.hpp */,
-				5FA2AC47232A9AE0007A8482 /* filesystem.cpp */,
 				5FA2AC45232A9AE0007A8482 /* filesystem.hpp */,
 				5FA2AC46232A9AE0007A8482 /* journal.cpp */,
 				5FA2AC48232A9AE0007A8482 /* journal.hpp */,
 				5FA2AC49232A9AE0007A8482 /* logger.cpp */,
 				5FA2AC40232A9AE0007A8482 /* logger.hpp */,
-				5FA2AC43232A9AE0007A8482 /* recoverylog.cpp */,
 				5FA2AC4D232A9AE0007A8482 /* recoverylog.hpp */,
 			);
 			path = src;
@@ -318,7 +311,7 @@
 		5FA2AC1C232A9A71007A8482 /* Project object */ = {
 			isa = PBXProject;
 			attributes = {
-				LastUpgradeCheck = 1030;
+				LastUpgradeCheck = 1110;
 				ORGANIZATIONNAME = paulyc;
 				TargetAttributes = {
 					5FA2AC23232A9A71007A8482 = {
@@ -338,6 +331,7 @@
 			hasScannedForEncodings = 0;
 			knownRegions = (
 				en,
+				Base,
 			);
 			mainGroup = 5FA2AC1B232A9A71007A8482;
 			productRefGroup = 5FA2AC25232A9A71007A8482 /* Products */;
@@ -357,7 +351,6 @@
 			buildActionMask = 2147483647;
 			files = (
 				5FA2AC5B232A9AE0007A8482 /* journal.cpp in Sources */,
-				5FA2AC59232A9AE0007A8482 /* entity.cpp in Sources */,
 				5FA2AC5E232A9AE0007A8482 /* logger.cpp in Sources */,
 				5FA2AC57232A9AE0007A8482 /* exception.cpp in Sources */,
 			);
@@ -562,6 +555,7 @@
 		5FA2AC73232A9B6C007A8482 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				CODE_SIGN_IDENTITY = "-";
 				CODE_SIGN_STYLE = Automatic;
 				DEVELOPMENT_TEAM = 5CXXA9F47J;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -571,6 +565,7 @@
 		5FA2AC74232A9B6C007A8482 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				CODE_SIGN_IDENTITY = "-";
 				CODE_SIGN_STYLE = Automatic;
 				DEVELOPMENT_TEAM = 5CXXA9F47J;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -580,6 +575,7 @@
 		5FA2AC84232A9C14007A8482 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				CODE_SIGN_IDENTITY = "-";
 				CODE_SIGN_STYLE = Automatic;
 				DEVELOPMENT_TEAM = 5CXXA9F47J;
 				HEADER_SEARCH_PATHS = (
@@ -593,6 +589,7 @@
 		5FA2AC85232A9C14007A8482 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				CODE_SIGN_IDENTITY = "-";
 				CODE_SIGN_STYLE = Automatic;
 				DEVELOPMENT_TEAM = 5CXXA9F47J;
 				HEADER_SEARCH_PATHS = (

@@ -36,6 +36,14 @@
 #include <codecvt>
 #include <regex>
 #include <iostream>
+#include <sstream>
+#include <iomanip>
+#include <regex>
+#include <cstdio>
+#include <cstring>
+
+#include <sys/mman.h>
+#include <unistd.h>
 
 #include "logger.hpp"
 #include "exfat_structs.hpp"
@@ -159,7 +167,105 @@ class RecoveryLogTextWriter : public RecoveryLogWriter<Filesystem_T>
 public:
     RecoveryLogTextWriter(const std::string &filename) : RecoveryLogWriter<Filesystem_T>(filename), _logfile(filename, std::ios::trunc) {}
 
-    //void writeTextLog(const std::string &devfilename, const std::string &logfilename);
+    void writeTextLog(
+        const std::string &devfilename,
+        const std::string &logfilename)
+    {
+
+        std::ifstream dev(devfilename, std::ios::binary);
+        std::ofstream log(logfilename, std::ios::app);
+
+        bool eof = false;
+        uint64_t buffer_offset = 0x0000000000000000;
+                              // 0x0000000100000000 == 4 GB
+        uint8_t buffer[0x100000], *bufp = buffer, *bufend = buffer + sizeof(buffer);
+        dev.seekg(buffer_offset);
+        dev.read((char*)buffer, sizeof(buffer));
+
+        while (!eof || bufp + 96 < bufend) {
+            //if (io::github::paulyc::ExFATRestore::ExFATFilesystem::verifyFileEntity(bufp, bufend - bufp)) {
+            //}
+
+            if (bufp[0] == exfat::FILE_DIR_ENTRY) {
+                if (bufp[32] == exfat::STREAM_EXTENSION && bufp[64] == exfat::FILE_NAME) {
+                    struct fs_file_directory_entry *m1 = (struct fs_file_directory_entry*)(bufp);
+                    struct fs_stream_extension_directory_entry *m2 = (struct fs_stream_extension_directory_entry*)(bufp+32);
+                    const int continuations = m1->continuations;
+                    if (continuations >= 2 && continuations <= 18) {
+                        int i, file_info_size = (continuations + 1) * 32;
+                        uint16_t chksum = 0;
+
+                        for (i = 0; i < 32; ++i) {
+                            if (i != 2 && i != 3) {
+                                chksum = ((chksum << 15) | (chksum >> 1)) + bufp[i];
+                            }
+                        }
+
+                        for (; i < file_info_size; ++i) {
+                            chksum = ((chksum << 15) | (chksum >> 1)) + bufp[i];
+                        }
+
+                        if (chksum == m1->checksum) {
+                            std::string fname;
+                            try {
+                                fname = _get_utf8_filename(bufp, m2->name_length);
+                            } catch (std::exception &e) {
+                                std::cerr << e.what() << std::endl;
+                                fname = "ERR";
+                            }
+                            log << "FDE " << std::setfill('0') << std::setw(16) << std::hex << buffer_offset + (bufp - buffer) << ' ' << fname << std::endl;
+                            std::cout << "FDE " << std::setfill('0') << std::setw(16) << std::hex << buffer_offset + (bufp - buffer) << ' ' << fname << std::endl;
+                            bufp += file_info_size - 1;
+                        }
+                    }
+                }
+            }
+
+            ++bufp;
+
+            const size_t buf_used = bufp - buffer;
+            if (buf_used >= 0xF0000 && !eof) {
+                ssize_t buf_left = sizeof(buffer) - buf_used;
+                memmove(buffer, bufp, buf_left);
+                bufp = buffer;
+                buffer_offset += buf_used;
+                ssize_t to_fill = sizeof(buffer) - buf_left;
+
+                try {
+                    dev.read((char*)(buffer + buf_left), to_fill);
+                    auto state = dev.rdstate();
+                    if (state & std::ifstream::goodbit) {
+                        //allgood
+                    } else if (state & std::ifstream::eofbit) {
+                        std::cout << "EOF" << std::endl;
+                        eof = true;
+                    } else if ((state & std::ifstream::failbit) || (state & std::ifstream::badbit)) {
+                        to_fill += buffer_offset % 512;
+                        buf_left -= buffer_offset % 512;
+                        size_t read_offset = buffer_offset + buf_left; // round down to sector
+
+                        while (to_fill > 0) {
+                            if (dev.fail() || dev.bad()) {
+                                log << "BAD_SECTOR " << std::setfill('0') << std::setw(16) << std::hex << read_offset << std::endl;
+                                log.flush();
+                                std::cout << "BAD_SECTOR " << std::setfill('0') << std::setw(16) << std::hex << read_offset << std::endl;
+                            }
+
+                            dev.clear();
+                            dev.seekg(read_offset);
+                            dev.read((char*)(buffer + buf_left), to_fill < 512 ? to_fill : 512);
+                            buf_left += 512;
+                            to_fill -= 512;
+                            read_offset += 512;
+                        }
+                    }
+                } catch (std::exception &e) {
+                    std::cerr << "ioexception: " << e.what() << std::endl;
+                }
+            }
+        }
+        log.close();
+    }
 private:
     std::ofstream _logfile;
 };
@@ -190,7 +296,5 @@ private:
 }
 }
 }
-
-#include "recoverylog.cpp"
 
 #endif /* _io_github_paulyc_recoverylog_hpp_ */
