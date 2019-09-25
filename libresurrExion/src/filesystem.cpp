@@ -25,83 +25,10 @@
 //  SOFTWARE.
 //
 
-#include "exception.hpp"
-#include "filesystem.hpp"
-#include "recoverylog.hpp"
-
-#include <stddef.h>
-#include <assert.h>
-#include <sys/mman.h>
-#include <sys/stat.h>
-#include <fcntl.h>
-#include <unistd.h>
-
-#ifndef O_RSYNC
-#define O_RSYNC O_SYNC
-#endif
 
 namespace github {
 namespace paulyc {
 namespace resurrExion {
-
-template <size_t SectorSize, size_t SectorsPerCluster, size_t NumSectors>
-ExFATFilesystem<SectorSize, SectorsPerCluster, NumSectors>::ExFATFilesystem(const char *devname, size_t devsize, size_t partition_first_sector, bool write_changes) :
-    _fd(-1),
-    _mmap((uint8_t*)MAP_FAILED),
-    _devsize(devsize),
-    _write_changes(write_changes)
-{
-    const int oflags = write_changes ? O_RDWR | O_DSYNC | O_RSYNC : O_RDONLY;
-    _fd = open(devname, oflags);
-    if (_fd == -1) {
-        throw std::system_error(std::error_code(errno, std::system_category()));
-    }
-
-    const int mprot = write_changes ? PROT_READ | PROT_WRITE : PROT_READ;
-    const int mflags = write_changes ? MAP_SHARED : MAP_PRIVATE;
-    _mmap = (uint8_t*)mmap(0, _devsize, mprot, mflags, _fd, 0);
-    if (_mmap == (uint8_t*)MAP_FAILED) {
-        throw std::system_error(std::error_code(errno, std::system_category()));
-    }
-
-    _partition_start = _mmap + partition_first_sector * SectorSize;
-    _partition_end = _partition_start + (NumSectors + 1) * SectorSize;
-    _fs = (exfat::filesystem_t<SectorSize, SectorsPerCluster, NumSectors>*)_partition_start;
-
-    _invalid_file_name_characters = {'"', '*', '/', ':', '<', '>', '?', '\\', '|'};
-    for (char16_t ch = 0; ch <= 0x001F; ++ch) {
-        _invalid_file_name_characters.push_back(ch);
-    }
-}
-
-template <size_t SectorSize, size_t SectorsPerCluster, size_t NumSectors>
-ExFATFilesystem<SectorSize, SectorsPerCluster, NumSectors>::~ExFATFilesystem()
-{
-    if (_mmap != MAP_FAILED) {
-        munmap(_mmap, _devsize);
-    }
-
-    if (_fd != -1) {
-        close(_fd);
-    }
-}
-
-template <size_t SectorSize, size_t SectorsPerCluster, size_t NumSectors>
-void ExFATFilesystem<SectorSize, SectorsPerCluster, NumSectors>::scanWriteToLog() {
-    uint8_t *end = _partition_end - sizeof(exfat::file_directory_entry_t);
-    for (uint8_t *peek = _partition_start; peek < end; ++peek) {
-        if (*peek == exfat::FILE_DIR_ENTRY) {
-            exfat::file_directory_entry_t *fde = (exfat::file_directory_entry_t*)(peek);
-            exfat::stream_extension_entry_t *m2 = (exfat::stream_extension_entry_t *)(peek+32);
-            if (fde->isValid() && m2->isValid()) {
-                if (fde->calc_set_checksum() == fde->checksum) {
-                    printf("FDE %016zull\n", peek-1);
-                }
-
-            }
-        }
-    }
-}
 
 template <size_t SectorSize, size_t SectorsPerCluster, size_t NumSectors>
 void
@@ -236,15 +163,15 @@ void ExFATFilesystem<SectorSize, SectorsPerCluster, NumSectors>::init_metadata()
 
     // calculate log base 2 of sector size and sectors per cluster
     size_t i = SectorSize;
-    _boot_region.vbr.bytes_per_sector = 0;
-    while (i >>= 1) { ++_boot_region.vbr.bytes_per_sector; }
+    _boot_region.vbr.log2_bytes_per_sector = 0;
+    while (i >>= 1) { ++_boot_region.vbr.log2_bytes_per_sector; }
 
-    _boot_region.vbr.sectors_per_cluster = 0;
+    _boot_region.vbr.log2_sectors_per_cluster = 0;
     i = SectorsPerCluster;
-    while (i >>= 1) { ++_boot_region.vbr.sectors_per_cluster; }
+    while (i >>= 1) { ++_boot_region.vbr.log2_sectors_per_cluster; }
 
     _boot_region.vbr.percent_used = 100;
-    _boot_region.checksum.calculate_checksum((uint8_t*)&_boot_region.vbr, sizeof(_boot_region.vbr));
+    _boot_region.checksum.fill_checksum((uint8_t*)&_boot_region.vbr, sizeof(_boot_region.vbr));
 
     _root_directory.label_entry.set_label(_cvt.from_bytes("Elements"));
 
@@ -253,10 +180,9 @@ void ExFATFilesystem<SectorSize, SectorsPerCluster, NumSectors>::init_metadata()
 	_allocation_bitmap.mark_all_alloc();
     _root_directory.bitmap_entry.data_length = sizeof(_allocation_bitmap.bitmap);
     _root_directory.bitmap_entry.first_cluster = 2;
-    _root_directory.bitmap_entry = _allocation_bitmap.get_entry();
+    _root_directory.bitmap_entry = _allocation_bitmap.get_directory_entry();
 
-	exfat::upcase_table_entry_t       upcase_entry;
-    _root_directory.upcase_entry.calc_checksum((const uint8_t*)&_upcase_table, sizeof(_upcase_table));
+    _root_directory.upcase_entry = _upcase_table.get_directory_entry();
 
     _root_directory.upcase_entry.data_length = sizeof(_upcase_table);
     _root_directory.upcase_entry.first_cluster = 3;
@@ -323,79 +249,6 @@ void ExFATFilesystem<SectorSize, SectorsPerCluster, NumSectors>::load_directory_
             _root_directory->add_child(entity);
         }
     }
-}
-
-constexpr static size_t ClusterHeapDiskStartSector = 0x8C400; // relative to partition start
-
-template <size_t SectorSize, size_t SectorsPerCluster, size_t NumSectors>
-void ExFATFilesystem<SectorSize, SectorsPerCluster, NumSectors>::restore_all_files(const std::string &restore_dir_name, const std::string &textlogfilename)
-{
-    RecoveryLogTextReader<ExFATFilesystem<SectorSize, SectorsPerCluster, NumSectors>> reader(textlogfilename);
-
-    reader.parseTextLog(*this, [this, &restore_dir_name](size_t offset, std::variant<std::string, std::exception, bool> entry_info){
-        if (std::holds_alternative<std::string>(entry_info)) {
-            // File entry
-            const std::string filename = std::get<std::string>(entry_info);
-            std::shared_ptr<FileEntity> ent = std::dynamic_pointer_cast<FileEntity>(loadEntity(offset));
-            if (!ent) {
-                logf(WARN, "Invalid file entry at offset %016llx\n", offset);
-                return;
-            }
-            if (ent->is_contiguous()) {
-                std::ofstream restored_file(restore_dir_name + std::string("/") + filename, std::ios_base::binary);
-                const uint32_t start_cluster = ent->get_start_cluster();
-                const size_t file_offset = start_cluster * sizeof(exfat::cluster_t<SectorSize, SectorsPerCluster>) + ClusterHeapDiskStartSector * SectorSize;
-                const size_t file_size = ent->get_size();
-                logf(INFO, "recovering file %s at cluster offset %08lx disk offset %016llx size %d\n",
-                     filename, start_cluster, file_offset, file_size);
-                restored_file.write((const char *)(_mmap + file_offset), file_size);
-                restored_file.close();
-            } else {
-                logf(WARN, "Non-contiguous file: %s\n", filename);
-            }
-        } else if (std::holds_alternative<bool>(entry_info)) {
-            // Bad sector, don't care
-        } else {
-            // Exception
-            std::exception &ex = std::get<std::exception>(entry_info);
-            logf(WARN, "entry_info had exception type %s with message %s\n", typeid(ex).name(), ex.what());
-        }
-    });
-}
-
-// todo split out the binlog logic
-/**
- * binlog format:
- * 64-bit unsigned int, disk offset of byte in record or sector
- * 32-bit int, number of bytes in record, OR -1 if bad sector
- * variable bytes equal to number of bytes in record
- */
-template <size_t SectorSize, size_t SectorsPerCluster, size_t NumSectors>
-void ExFATFilesystem<SectorSize, SectorsPerCluster, NumSectors>::textLogToBinLog(
-    const std::string &textlogfilename,
-    const std::string &binlogfilename)
-{
-    RecoveryLogTextReader<ExFATFilesystem<SectorSize, SectorsPerCluster, NumSectors>> reader(textlogfilename);
-    RecoveryLogBinaryWriter<ExFATFilesystem<SectorSize, SectorsPerCluster, NumSectors>> writer(binlogfilename);
-
-    reader.parseTextLog(*this, [this, &writer](size_t offset, std::variant<std::string, std::exception, bool> entry_info) {
-        if (std::holds_alternative<std::string>(entry_info)) {
-            // File entry
-            std::shared_ptr<BaseEntity> entity = loadEntity(_mmap + offset, nullptr);
-            if (entity) {
-                writer.writeEntityToBinLog(offset, _mmap + offset, entity);
-            } else {
-                logf(WARN, "failed to loadEntity at offset %016ull\n", offset);
-            }
-        } else if (std::holds_alternative<bool>(entry_info)) {
-            // Bad sector
-            writer.writeBadSectorToBinLog(offset);
-        } else {
-            // Exception
-            std::exception &ex = std::get<std::exception>(entry_info);
-            logf(WARN, "entry_info had exception type %s with message %s\n", typeid(ex).name(), ex.what());
-        }
-    });
 }
 
 }
