@@ -34,15 +34,9 @@ set(LIB_HEADERS
 )
 
 set(LIB_COMPILE_SOURCES
-	entity.cpp
 	exception.cpp
 	journal.cpp
 	logger.cpp
-)
-
-set(LIB_NO_COMPILE_SOURCES
-	filesystem.cpp
-	recoverylog.cpp
 )
 
 add_library(
@@ -50,9 +44,8 @@ add_library(
 	SHARED
 	${LIB_HEADERS}
 	${LIB_COMPILE_SOURCES}
-	${LIB_NO_COMPILE_SOURCES}
 )
 
-set_source_files_properties(${LIB_NO_COMPILE_SOURCES} PROPERTIES HEADER_FILE_ONLY TRUE)
+#set_source_files_properties(${LIB_NO_COMPILE_SOURCES} PROPERTIES HEADER_FILE_ONLY TRUE)
 target_include_directories(resurrExion PUBLIC ../config)
 target_link_libraries(resurrExion pthread)
