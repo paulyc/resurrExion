@@ -37,6 +37,7 @@ set(LIB_HEADERS
 set(LIB_COMPILE_SOURCES
 	journal.cpp
 	logger.cpp
+	entity.cpp
 )
 
 add_library(

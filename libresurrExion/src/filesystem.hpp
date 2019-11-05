@@ -28,17 +28,18 @@
 #ifndef _github_paulyc_filesystem_hpp_
 #define _github_paulyc_filesystem_hpp_
 
-#include <stdint.h>
-
+#include <cstdint>
 #include <variant>
 #include <memory>
 #include <fstream>
 #include <memory>
 #include <unordered_map>
+#include <unordered_set>
 #include <locale>
 #include <codecvt>
 #include <list>
 #include <vector>
+#include <tuple>
 
 #include "exception.hpp"
 #include "recoverylog.hpp"
@@ -110,6 +111,10 @@ public:
         if (_fd != -1) {
             close(_fd);
         }
+    }
+
+    std::shared_ptr<BaseEntity> loadEntityOffset(std::streamoff entity_offset, std::shared_ptr<BaseEntity> parent) {
+        return loadEntity(_mmap + entity_offset, parent);
     }
 
     std::shared_ptr<BaseEntity> loadEntity(uint8_t *entity_start, std::shared_ptr<BaseEntity> parent)
@@ -190,12 +195,12 @@ public:
                 std::make_shared<DirectoryEntity>(entity_start, continuations + 1, parent, utf8_name);
             _offset_to_entity_mapping[de->get_entity_start()] = de;
             this->loadDirectory(de);
-            return de;
+            return std::move(de);
         } else {
             std::shared_ptr<FileEntity> fe =
                 std::make_shared<FileEntity>(entity_start, continuations + 1, parent, utf8_name);
             _offset_to_entity_mapping[fe->get_entity_start()] = fe;
-            return fe;
+            return std::move(fe);
         }
     }
 
@@ -207,13 +212,14 @@ public:
             // directory children immediately follow
             dirent = de->get_entity_start() + de->get_num_entries();
         } else {
-            dirent = (exfat::metadata_entry_u *)_fs->cluster_heap.storage[start_cluster].sectors[0].data;
+            dirent = (exfat::metadata_entry_u *)_fs->data_region.cluster_heap.storage[start_cluster].sectors[0].data;
         }
 
         const uint8_t num_secondary_entries = ((exfat::primary_directory_entry_t*)dirent)->secondary_count;
         for (uint8_t secondary_entry = 0; secondary_entry < num_secondary_entries; ++secondary_entry) {
             std::shared_ptr<BaseEntity> child = this->loadEntity((uint8_t*)dirent, de);
             de->add_child(child);
+            child->set_parent(de);
             dirent += child->get_num_entries();
         }
     }
@@ -295,32 +301,61 @@ public:
     void load_directory_tree(const std::string &textlogfilename)
     {
         // load everything in the log, and put anything without a parent into the root directory
-        RecoveryLog<ExFATFilesystem<SectorSize, SectorsPerCluster, NumSectors>> reader;
+        typedef RecoveryLog<ExFATFilesystem<SectorSize, SectorsPerCluster, NumSectors>> log_t;
+        typedef typename log_t::Entity_T entity_t;
+        log_t reader;
 
-        reader.parseTextLog(textlogfilename, *this, [this](size_t offset, std::variant<std::string, std::exception, bool> entry_info) {
-            if (std::holds_alternative<std::string>(entry_info)) {
-                // File entry
-                const std::string filename = std::get<std::string>(entry_info);
-                std::shared_ptr<FileEntity> ent = std::dynamic_pointer_cast<FileEntity>(loadEntity(offset));
-                if (!ent) {
-                    logf(WARN, "Invalid file entry at offset %016llx\n", offset);
-                    return;
+        reader.parseTextLog(textlogfilename, *this, [this](std::streamoff offset, entity_t ent, std::optional<std::exception> except) {
+            if (except.has_value()) {
+                const std::exception &ex = except.value();
+                logf(WARN, "entry_info had exception type %s with message %s\n", typeid(ex).name(), ex.what());
+            } else if (ent != nullptr) {
+                switch (ent->get_type()) {
+                case BaseEntity::File:
+                {
+                    std::shared_ptr<FileEntity> f = std::dynamic_pointer_cast<FileEntity>(ent);
+                    if (!f) {
+                        logf(WARN, "Invalid file entry at offset %016llx\n", offset);
+                        return;
+                    }
+                    break;
                 }
-            } else if (std::holds_alternative<bool>(entry_info)) {
+                case BaseEntity::Directory:
+                {
+                    std::shared_ptr<DirectoryEntity> d = std::dynamic_pointer_cast<DirectoryEntity>(ent);
+                    if (!d) {
+                        logf(WARN, "Invalid directory entry at offset %016llx\n", offset);
+                        return;
+                    }
+                    for (auto &child: d->get_children()) {
+                        child->set_parent(ent);
+                    }
+                    break;
+                }
+                default:
+                    logf(WARN, "Unknown entity type\n");
+                    break;
+                }
+            } else {
                 // Bad sector, mark it in the fat
                 _fat.entries[offset] = exfat::BAD_CLUSTER;
-            } else {
-                // Exception
-                std::exception &ex = std::get<std::exception>(entry_info);
-                logf(WARN, "entry_info had exception type %s with message %s\n", typeid(ex).name(), ex.what());
             }
         });
 
         // find everything without a parent
         for (const auto & [ entry_ptr, entity ] : _offset_to_entity_mapping) {
             if (entity->get_parent() == nullptr) {
+                fprintf(stderr, "ORPHAN %016llx %s\n", entry_ptr, entity->get_name());
                 entity->set_parent(_root_directory);
                 _root_directory->add_child(entity);
+            }
+        }
+    }
+
+    void find_orphans(std::function<void(std::streamoff offset, std::shared_ptr<BaseEntity> ent)> fun) {
+        for (auto & [ entry_ptr, entity ] : _offset_to_entity_mapping) {
+            if (entity->get_parent() == nullptr) {
+                fun((std::streamoff)entry_ptr, entity);
             }
         }
     }
@@ -436,6 +471,7 @@ private:
     exfat::filesystem_t<SectorSize, SectorsPerCluster, NumSectors> *_fs; // actual mmaped filesystem
 
     std::unordered_map<exfat::metadata_entry_u*, std::shared_ptr<BaseEntity>> _offset_to_entity_mapping;
+    std::unordered_set<std::shared_ptr<BaseEntity>> _orphan_entities;
     std::unique_ptr<RootDirectoryEntity> _root_directory_entity;
     std::wstring_convert<std::codecvt_utf8_utf16<char16_t>, char16_t> _cvt;
 

@@ -81,9 +81,7 @@ public:
                 filename = sm[2];
                 try {
                     offset = std::stol(sm[1], nullptr, 16);
-#warning TODO have to translate from an offset to a pointer!!
-                    //Entity_T ent = fs.loadEntity(offset, nullptr);
-                    Entity_T ent = nullptr;
+                    Entity_T ent = fs.loadEntityOffset(offset, nullptr);
                     cb(offset, ent, std::nullopt);
                 } catch (std::exception &ex) {
                     std::cerr << "Writing file entry to binlog, got exception: " << typeid(ex).name() << " with msg: " << ex.what() << std::endl;
