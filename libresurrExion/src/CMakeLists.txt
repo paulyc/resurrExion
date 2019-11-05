@@ -31,6 +31,7 @@ set(LIB_HEADERS
 	journal.hpp
 	logger.hpp
 	recoverylog.hpp
+	circbuf.hpp
 )
 
 set(LIB_COMPILE_SOURCES
@@ -46,6 +47,6 @@ add_library(
 	${LIB_COMPILE_SOURCES}
 )
 
-#set_source_files_properties(${LIB_NO_COMPILE_SOURCES} PROPERTIES HEADER_FILE_ONLY TRUE)
-target_include_directories(resurrExion PUBLIC ../config)
+set_source_files_properties(${LIB_HEADERS} PROPERTIES HEADER_FILE_ONLY TRUE)
+target_include_directories(resurrExion PUBLIC ../config .)
 target_link_libraries(resurrExion pthread)
