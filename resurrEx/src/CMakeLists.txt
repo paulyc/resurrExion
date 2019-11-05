@@ -23,5 +23,9 @@
 #
 
 add_executable(resurrEx main.cpp)
-target_include_directories(resurrEx PUBLIC ${Boost_INCLUDE_DIRS} ../../libresurrExion/src)
+target_include_directories(resurrEx PUBLIC ${Boost_INCLUDE_DIRS} ../../config ../../libresurrExion/src)
 target_link_libraries(resurrEx resurrExion ${Boost_LIBRARIES})
+
+add_executable(quick quick.cpp)
+target_include_directories(quick PUBLIC ${Boost_INCLUDE_DIRS} ../../config ../../libresurrExion/src)
+target_link_libraries(quick resurrExion ${Boost_LIBRARIES})
