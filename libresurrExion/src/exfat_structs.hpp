@@ -431,8 +431,8 @@ struct upcase_table_t {
         }
 
         return upcase_table_entry_t {
-            .data_length = sz_bytes,
             .checksum = chksum,
+            .data_length = sz_bytes,
         };
     }
 } __attribute__((packed));
