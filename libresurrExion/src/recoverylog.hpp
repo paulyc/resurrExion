@@ -31,7 +31,7 @@
 #include <string>
 #include <fstream>
 #include <functional>
-#include <variant>
+#include <optional>
 #include <locale>
 #include <codecvt>
 #include <regex>
@@ -46,7 +46,7 @@
 #include <unistd.h>
 
 #include "logger.hpp"
-#include "exfat_structs.hpp"
+#include "entity.hpp"
 
 namespace github {
 namespace paulyc {
@@ -61,65 +61,49 @@ template <typename Filesystem_T>
 class RecoveryLog : public Loggable
 {
 public:
+    typedef std::shared_ptr<BaseEntity> Entity_T;
+
     RecoveryLog() = default;
     ~RecoveryLog() = default;
 
-protected:
-    std::string _get_utf8_filename(uint8_t *fh, int namelen)
-    {
-        exfat::file_directory_entry_t *fde = (exfat::file_directory_entry_t *)fh;
-        const int continuations = fde->continuations;
-        std::basic_string<char16_t> u16s;
-        for (int c = 1; c <= continuations; ++c) {
-            fh += 32;
-            if (fh[0] == exfat::FILE_NAME) {
-                exfat::file_name_entry_t *n = (exfat::file_name_entry_t*)fh;
-                for (int i = 0; i < sizeof(n->name); ++i) {
-                    if (u16s.length() == namelen) {
-                        return _cvt.to_bytes(u16s);
-                    } else {
-                        u16s.push_back(n->name[i]);
-                    }
-                }
-            }
-        }
-        return _cvt.to_bytes(u16s);
-    }
-
-    void parseTextLog(const std::string &filename, Filesystem_T &fs, std::function<void(size_t, std::variant<std::string, std::exception, bool>)> cb)
+    void parseTextLog(const std::string &filename, Filesystem_T &fs,
+                      std::function<void(std::streamoff, Entity_T, std::optional<std::exception>)> cb)
     {
         std::regex fde("FDE ([0-9a-fA-F]{16})(?: (.*))?");
         std::regex badsector("BAD_SECTOR ([0-9a-fA-F]{16})");
         std::ifstream logfile(filename);
-
-        for (std::string line; std::getline(logfile, line); ) {
+        size_t count = 0;
+        for (std::string line; std::getline(logfile, line); ++count) {
             std::smatch sm;
+            if (count % 1000 == 0) {
+                printf("count: %zu\n", count);
+            }
             if (std::regex_match(line, sm, fde)) {
-                size_t offset;
+                std::streamoff offset;
                 std::string filename;
                 filename = sm[2];
                 try {
                     offset = std::stol(sm[1], nullptr, 16);
-                    std::shared_ptr<typename Filesystem_T::BaseEntity> ent = fs.loadEntity(offset);
-                    cb(offset, std::variant<std::string, std::exception, bool>(filename));
+                    Entity_T ent = fs.loadEntityOffset(offset, nullptr);
+                    cb(offset, ent, std::nullopt);
                 } catch (std::exception &ex) {
                     std::cerr << "Writing file entry to binlog, got exception: " << typeid(ex).name() << " with msg: " << ex.what() << std::endl;
                     std::cerr << "Invalid textlog FDE line, skipping: " << line << std::endl;
-                    cb(0, std::variant<std::string, std::exception, bool>(ex));
+                    cb(0, nullptr, std::make_optional(ex));
                 }
             } else if (std::regex_match(line, sm, badsector)) {
-                size_t offset;
+                std::streamoff offset;
                 try {
                     offset = std::stol(sm[1], nullptr, 16);
-                    cb(offset, std::variant<std::string, std::exception, bool>(true));
+                    cb(offset, nullptr, std::nullopt);
                 } catch (std::exception &ex) {
                     std::cerr << "Writing bad sector to binlog, got exception " << typeid(ex).name() << " with msg: " << ex.what() << std::endl;
                     std::cerr << "Invalid textlog BAD_SECTOR line, skipping: " << line << std::endl;
-                    cb(0, std::variant<std::string, std::exception, bool>(ex));
+                    cb(0, nullptr, std::make_optional(ex));
                 }
             } else {
                 std::cerr << "Unknown textlog line format: " << line << std::endl;
-                cb(0, std::variant<std::string, std::exception, bool>(std::exception()));
+                cb(0, nullptr, std::make_optional(std::exception()));
             }
         }
     }
@@ -234,13 +218,34 @@ protected:
         logfile.write((const char *)&BadSectorFlag, sizeof(int32_t));
     }
 
-    void writeEntityToBinLog(std::ofstream &logfile, size_t offset, uint8_t *fde, std::shared_ptr<typename Filesystem_T::BaseEntity> entity) {
+    void writeEntityToBinLog(std::ofstream &logfile, size_t offset, uint8_t *fde, Entity_T entity) {
         const int entries_size_bytes = entity->get_file_info_size();
         logfile.write((const char*)&offset, sizeof(size_t));
         logfile.write((const char*)&entries_size_bytes, sizeof(int32_t));
         logfile.write((const char*)fde, entries_size_bytes);
     }
 
+protected:
+    std::string _get_utf8_filename(uint8_t *fh, int namelen)
+    {
+        exfat::file_directory_entry_t *fde = (exfat::file_directory_entry_t *)fh;
+        const int continuations = fde->continuations;
+        std::basic_string<char16_t> u16s;
+        for (int c = 1; c <= continuations; ++c) {
+            fh += 32;
+            if (fh[0] == exfat::FILE_NAME) {
+                exfat::file_name_entry_t *n = (exfat::file_name_entry_t*)fh;
+                for (int i = 0; i < sizeof(n->name); ++i) {
+                    if (u16s.length() == namelen) {
+                        return _cvt.to_bytes(u16s);
+                    } else {
+                        u16s.push_back(n->name[i]);
+                    }
+                }
+            }
+        }
+        return _cvt.to_bytes(u16s);
+    }
 private:
     std::wstring_convert<std::codecvt_utf8_utf16<char16_t>, char16_t> _cvt;
 };
