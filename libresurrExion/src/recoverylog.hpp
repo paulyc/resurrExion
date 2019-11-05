@@ -72,9 +72,12 @@ public:
         std::regex fde("FDE ([0-9a-fA-F]{16})(?: (.*))?");
         std::regex badsector("BAD_SECTOR ([0-9a-fA-F]{16})");
         std::ifstream logfile(filename);
-
-        for (std::string line; std::getline(logfile, line); ) {
+        size_t count = 0;
+        for (std::string line; std::getline(logfile, line); ++count) {
             std::smatch sm;
+            if (count % 1000 == 0) {
+                printf("count: %zu\n", count);
+            }
             if (std::regex_match(line, sm, fde)) {
                 std::streamoff offset;
                 std::string filename;

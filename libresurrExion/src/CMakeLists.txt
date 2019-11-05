@@ -47,6 +47,6 @@ add_library(
 	${LIB_COMPILE_SOURCES}
 )
 
-set_source_files_properties(${LIB_HEADERS} PROPERTIES HEADER_FILE_ONLY TRUE)
+#set_source_files_properties(${LIB_HEADERS} PROPERTIES HEADER_FILE_ONLY TRUE)
 target_include_directories(resurrExion PUBLIC ../config .)
-target_link_libraries(resurrExion pthread)
+target_link_libraries(resurrExion)

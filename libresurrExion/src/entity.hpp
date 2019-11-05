@@ -48,6 +48,8 @@ public:
         Unknown
     };
 
+    BaseEntity() : _fs_entries(nullptr), _num_entries(0), _parent(nullptr), _name("invalid") {}
+
     BaseEntity(void *entry_start, uint8_t num_entries, std::shared_ptr<BaseEntity> parent, const std::string &name) :
         _fs_entries((exfat::metadata_entry_u*)entry_start),
         _num_entries(num_entries),

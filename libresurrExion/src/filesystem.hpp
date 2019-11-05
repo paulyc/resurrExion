@@ -355,7 +355,7 @@ public:
     void find_orphans(std::function<void(std::streamoff offset, std::shared_ptr<BaseEntity> ent)> fun) {
         for (auto & [ entry_ptr, entity ] : _offset_to_entity_mapping) {
             if (entity->get_parent() == nullptr) {
-                fun((std::streamoff)entry_ptr, entity);
+                fun(((std::streamoff)entry_ptr - (std::streamoff)_fs), entity);
             }
         }
     }
@@ -418,7 +418,7 @@ public:
                     // File entry
                     std::shared_ptr<BaseEntity> entity = loadEntity(_mmap + offset, nullptr);
                     if (entity) {
-                        writeEntityToBinLog(binlog, offset, _mmap + offset, entity);
+                        readwriter.writeEntityToBinLog(binlog, offset, _mmap + offset, entity);
                     } else {
                         logf(WARN, "failed to loadEntity at offset %016ull\n", offset);
                     }
