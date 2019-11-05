@@ -295,9 +295,9 @@ public:
     void load_directory_tree(const std::string &textlogfilename)
     {
         // load everything in the log, and put anything without a parent into the root directory
-        RecoveryLogTextReader<ExFATFilesystem<SectorSize, SectorsPerCluster, NumSectors>> reader(textlogfilename);
+        RecoveryLog<ExFATFilesystem<SectorSize, SectorsPerCluster, NumSectors>> reader;
 
-        reader.parseTextLog(*this, [this](size_t offset, std::variant<std::string, std::exception, bool> entry_info) {
+        reader.parseTextLog(textlogfilename, *this, [this](size_t offset, std::variant<std::string, std::exception, bool> entry_info) {
             if (std::holds_alternative<std::string>(entry_info)) {
                 // File entry
                 const std::string filename = std::get<std::string>(entry_info);
@@ -330,9 +330,9 @@ public:
     // TODO take out this trash
     void restore_all_files(const std::string &restore_dir_name, const std::string &textlogfilename)
     {
-        RecoveryLogTextReader<ExFATFilesystem<SectorSize, SectorsPerCluster, NumSectors>> reader(textlogfilename);
+        RecoveryLog<ExFATFilesystem<SectorSize, SectorsPerCluster, NumSectors>> reader;
 
-        reader.parseTextLog(*this, [this, &restore_dir_name](size_t offset, std::variant<std::string, std::exception, bool> entry_info){
+        reader.parseTextLog(textlogfilename, *this, [this, &restore_dir_name](size_t offset, std::variant<std::string, std::exception, bool> entry_info){
             if (std::holds_alternative<std::string>(entry_info)) {
                 // File entry
                 const std::string filename = std::get<std::string>(entry_info);
@@ -375,26 +375,27 @@ public:
         const std::string &textlogfilename,
         const std::string &binlogfilename)
     {
-        RecoveryLogTextReader<ExFATFilesystem<SectorSize, SectorsPerCluster, NumSectors>> reader(textlogfilename);
-        RecoveryLogBinaryWriter<ExFATFilesystem<SectorSize, SectorsPerCluster, NumSectors>> writer(binlogfilename);
+        RecoveryLog<ExFATFilesystem<SectorSize, SectorsPerCluster, NumSectors>> readwriter;
 
-        reader.parseTextLog(*this, [this, &writer](size_t offset, std::variant<std::string, std::exception, bool> entry_info) {
-            if (std::holds_alternative<std::string>(entry_info)) {
-                // File entry
-                std::shared_ptr<BaseEntity> entity = loadEntity(_mmap + offset, nullptr);
-                if (entity) {
-                    writer.writeEntityToBinLog(offset, _mmap + offset, entity);
+        readwriter.writeBinLog(binlogfilename, [this, &textlogfilename, &readwriter](std::ofstream &binlog) {
+            readwriter.parseTextLog(textlogfilename, *this, [this, &binlog, &readwriter](size_t offset, std::variant<std::string, std::exception, bool> entry_info) {
+                if (std::holds_alternative<std::string>(entry_info)) {
+                    // File entry
+                    std::shared_ptr<BaseEntity> entity = loadEntity(_mmap + offset, nullptr);
+                    if (entity) {
+                        writeEntityToBinLog(binlog, offset, _mmap + offset, entity);
+                    } else {
+                        logf(WARN, "failed to loadEntity at offset %016ull\n", offset);
+                    }
+                } else if (std::holds_alternative<bool>(entry_info)) {
+                    // Bad sector
+                    readwriter.writeBadSectorToBinLog(binlog, offset);
                 } else {
-                    logf(WARN, "failed to loadEntity at offset %016ull\n", offset);
+                    // Exception
+                    std::exception &ex = std::get<std::exception>(entry_info);
+                    logf(WARN, "entry_info had exception type %s with message %s\n", typeid(ex).name(), ex.what());
                 }
-            } else if (std::holds_alternative<bool>(entry_info)) {
-                // Bad sector
-                writer.writeBadSectorToBinLog(offset);
-            } else {
-                // Exception
-                std::exception &ex = std::get<std::exception>(entry_info);
-                logf(WARN, "entry_info had exception type %s with message %s\n", typeid(ex).name(), ex.what());
-            }
+            });
         });
     }
 
