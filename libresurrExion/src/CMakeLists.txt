@@ -35,7 +35,6 @@ set(LIB_HEADERS
 )
 
 set(LIB_COMPILE_SOURCES
-	exception.cpp
 	journal.cpp
 	logger.cpp
 )

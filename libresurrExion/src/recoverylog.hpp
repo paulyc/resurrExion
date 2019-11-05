@@ -58,11 +58,11 @@ constexpr int exfat_filename_maxlen_utf8 = exfat_filename_maxlen * 2;
 static constexpr int32_t BadSectorFlag = -1;
 
 template <typename Filesystem_T>
-class RecoveryLogBase : public Loggable
+class RecoveryLog : public Loggable
 {
 public:
-    RecoveryLogBase(const std::string &filename) : _filename(filename) {}
-    virtual ~RecoveryLogBase() {}
+    RecoveryLog() = default;
+    ~RecoveryLog() = default;
 
 protected:
     std::string _get_utf8_filename(uint8_t *fh, int namelen)
@@ -86,30 +86,13 @@ protected:
         return _cvt.to_bytes(u16s);
     }
 
-    std::string _filename;
-    std::wstring_convert<std::codecvt_utf8_utf16<char16_t>, char16_t> _cvt;
-};
-
-template <typename Filesystem_T>
-class RecoveryLogReader : public RecoveryLogBase<Filesystem_T>
-{
-public:
-    RecoveryLogReader(const std::string &filename) : RecoveryLogBase<Filesystem_T>(filename) {}
-    virtual ~RecoveryLogReader() {}
-};
-
-template <typename Filesystem_T>
-class RecoveryLogTextReader : public RecoveryLogReader<Filesystem_T>
-{
-public:
-    RecoveryLogTextReader(const std::string &filename) : RecoveryLogReader<Filesystem_T>(filename), _logfile(filename) {}
-
-    void parseTextLog(Filesystem_T &fs, std::function<void(size_t, std::variant<std::string, std::exception, bool>)> cb)
+    void parseTextLog(const std::string &filename, Filesystem_T &fs, std::function<void(size_t, std::variant<std::string, std::exception, bool>)> cb)
     {
         std::regex fde("FDE ([0-9a-fA-F]{16})(?: (.*))?");
         std::regex badsector("BAD_SECTOR ([0-9a-fA-F]{16})");
+        std::ifstream logfile(filename);
 
-        for (std::string line; std::getline(_logfile, line); ) {
+        for (std::string line; std::getline(logfile, line); ) {
             std::smatch sm;
             if (std::regex_match(line, sm, fde)) {
                 size_t offset;
@@ -140,32 +123,6 @@ public:
             }
         }
     }
-private:
-    std::ifstream _logfile;
-};
-
-template <typename Filesystem_T>
-class RecoveryLogBinaryReader : public RecoveryLogReader<Filesystem_T>
-{
-public:
-    RecoveryLogBinaryReader(const std::string &filename) : RecoveryLogReader<Filesystem_T>(filename), _logfile(filename, std::ios::binary) {}
-private:
-    std::ifstream _logfile;
-};
-
-template <typename Filesystem_T>
-class RecoveryLogWriter : public RecoveryLogBase<Filesystem_T>
-{
-public:
-    RecoveryLogWriter(const std::string &filename) : RecoveryLogBase<Filesystem_T>(filename) {}
-    virtual ~RecoveryLogWriter() {}
-};
-
-template <typename Filesystem_T>
-class RecoveryLogTextWriter : public RecoveryLogWriter<Filesystem_T>
-{
-public:
-    RecoveryLogTextWriter(const std::string &filename) : RecoveryLogWriter<Filesystem_T>(filename), _logfile(filename, std::ios::trunc) {}
 
     void writeTextLog(
         const std::string &devfilename,
@@ -176,7 +133,7 @@ public:
         std::ofstream log(logfilename, std::ios::app);
 
         bool eof = false;
-        uint64_t buffer_offset = 0x0000000000000000;
+        std::streamoff buffer_offset = 0x0000000000000000;
                               // 0x0000000100000000 == 4 GB
         uint8_t buffer[0x100000], *bufp = buffer, *bufend = buffer + sizeof(buffer);
         dev.seekg(buffer_offset);
@@ -188,8 +145,8 @@ public:
 
             if (bufp[0] == exfat::FILE_DIR_ENTRY) {
                 if (bufp[32] == exfat::STREAM_EXTENSION && bufp[64] == exfat::FILE_NAME) {
-                    struct fs_file_directory_entry *m1 = (struct fs_file_directory_entry*)(bufp);
-                    struct fs_stream_extension_directory_entry *m2 = (struct fs_stream_extension_directory_entry*)(bufp+32);
+                    struct exfat::file_directory_entry_t *m1 = (struct exfat::file_directory_entry_t*)(bufp);
+                    struct exfat::stream_extension_entry_t *m2 = (struct exfat::stream_extension_entry_t*)(bufp+32);
                     const int continuations = m1->continuations;
                     if (continuations >= 2 && continuations <= 18) {
                         int i, file_info_size = (continuations + 1) * 32;
@@ -223,7 +180,7 @@ public:
 
             ++bufp;
 
-            const size_t buf_used = bufp - buffer;
+            const ssize_t buf_used = bufp - buffer;
             if (buf_used >= 0xF0000 && !eof) {
                 ssize_t buf_left = sizeof(buffer) - buf_used;
                 memmove(buffer, bufp, buf_left);
@@ -242,7 +199,7 @@ public:
                     } else if ((state & std::ifstream::failbit) || (state & std::ifstream::badbit)) {
                         to_fill += buffer_offset % 512;
                         buf_left -= buffer_offset % 512;
-                        size_t read_offset = buffer_offset + buf_left; // round down to sector
+                        std::streamoff read_offset = buffer_offset + buf_left; // round down to sector
 
                         while (to_fill > 0) {
                             if (dev.fail() || dev.bad()) {
@@ -266,31 +223,26 @@ public:
         }
         log.close();
     }
-private:
-    std::ofstream _logfile;
-};
 
-template <typename Filesystem_T>
-class RecoveryLogBinaryWriter : public RecoveryLogWriter<Filesystem_T>
-{
-public:
-    RecoveryLogBinaryWriter(const std::string &filename) : RecoveryLogWriter<Filesystem_T>(filename), _logfile(filename, std::ios::binary | std::ios::trunc) {}
-
-    void writeBadSectorToBinLog(size_t offset) {
-        _writeToBinLog((const char *)&offset, sizeof(size_t));
-        _writeToBinLog((const char *)&BadSectorFlag, sizeof(int32_t));
+    void writeBinLog(const std::string &filename, std::function<void(std::ofstream&)> cb) {
+        std::ofstream logfile(filename, std::ios::binary | std::ios::trunc);
+        cb(logfile);
     }
 
-    void writeEntityToBinLog(size_t offset, uint8_t *fde, std::shared_ptr<typename Filesystem_T::BaseEntity> entity) {
+    void writeBadSectorToBinLog(std::ofstream &logfile, size_t offset) {
+        logfile.write((const char *)&offset, sizeof(size_t));
+        logfile.write((const char *)&BadSectorFlag, sizeof(int32_t));
+    }
+
+    void writeEntityToBinLog(std::ofstream &logfile, size_t offset, uint8_t *fde, std::shared_ptr<typename Filesystem_T::BaseEntity> entity) {
         const int entries_size_bytes = entity->get_file_info_size();
-        _writeToBinLog((const char*)&offset, sizeof(size_t));
-        _writeToBinLog((const char*)&entries_size_bytes, sizeof(int32_t));
-        _writeToBinLog((const char*)fde, entries_size_bytes);
+        logfile.write((const char*)&offset, sizeof(size_t));
+        logfile.write((const char*)&entries_size_bytes, sizeof(int32_t));
+        logfile.write((const char*)fde, entries_size_bytes);
     }
-private:
-    void _writeToBinLog(const char *buf, size_t count) { _logfile.write(buf, count); }
 
-    std::ofstream _logfile;
+private:
+    std::wstring_convert<std::codecvt_utf8_utf16<char16_t>, char16_t> _cvt;
 };
 
 }
