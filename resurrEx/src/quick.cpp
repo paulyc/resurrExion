@@ -32,6 +32,7 @@
 #include <stddef.h>
 #include <assert.h>
 #include <sys/mman.h>
+#include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <sys/fcntl.h>
@@ -174,17 +175,17 @@ public:
     }
 
     void open(std::string devpath) {
-        const bool write_changes = false;
-        const int oflags = write_changes ? O_RDWR | O_DSYNC | O_RSYNC : O_RDONLY;
-        _fd = ::open(devpath.c_str(), oflags);
+        //const bool write_changes = false;
+        //const int oflags = write_changes ? O_RDWR | O_DSYNC | O_RSYNC : O_RDONLY;
+        _fd = ::open(devpath.c_str(), O_RDONLY | O_DSYNC | O_RSYNC);
         if (_fd == -1) {
             std::cerr << "failed to open device " << devpath << std::endl;
             throw std::system_error(std::error_code(errno, std::system_category()));
         }
 
-        const int mprot = write_changes ? PROT_READ | PROT_WRITE : PROT_READ;
-        const int mflags = write_changes ? MAP_SHARED : MAP_PRIVATE;
-        _mmap = (uint8_t*)mmap(0, DiskSize, mprot, mflags, _fd, 0);
+        //const int mprot = write_changes ? PROT_READ | PROT_WRITE : PROT_READ;
+        //const int mflags = write_changes ? MAP_SHARED : MAP_PRIVATE | MAP_NOCACHE;
+        _mmap = (uint8_t*)mmap(0, DiskSize, PROT_READ, MAP_ANON|MAP_FILE|MAP_SHARED | MAP_NOCACHE, _fd, 0);
         if (_mmap == (uint8_t*)MAP_FAILED) {
             std::cerr << "error opening mmap" << std::endl;
             throw std::system_error(std::error_code(errno, std::system_category()));
