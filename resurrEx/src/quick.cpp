@@ -52,45 +52,101 @@
 #include <iostream>
 #include <functional>
 #include <regex>
-#include <unordered_set>
-#include <optional>
 
 #include "exfat_structs.hpp"
 
+using namespace github::paulyc;
+using namespace github::paulyc::resurrExion;
+
+typedef uint8_t my_cluster[512*512];
+
+namespace {
+    std::wstring_convert<std::codecvt_utf8_utf16<char16_t>, char16_t> cvt;
+}
+
+std::string get_utf8_filename(exfat::file_directory_entry_t *fde, struct exfat::stream_extension_entry_t *sde)
+{
+    const int continuations = fde->continuations;
+    const int namelen = sde->name_length;
+    std::basic_string<char16_t> u16s;
+    for (int c = 2; c <= continuations; ++c) {
+        exfat::file_name_entry_t *n = (exfat::file_name_entry_t *)(((uint8_t*)fde) + c*32);
+        if (n->type == exfat::FILE_NAME) {
+            for (int i = 0; i < sizeof(n->name); ++i) {
+                if (u16s.length() == namelen) {
+                    return cvt.to_bytes(u16s);
+                } else {
+                    u16s.push_back((char16_t)n->name[i]);
+                }
+            }
+        }
+    }
+    return cvt.to_bytes(u16s);
+}
+
+class Entity;
+
+Entity * make_entity(std::streamoff offset, exfat::file_directory_entry_t *fde);
+
 class Entity{
 public:
+    Entity(std::streamoff offset, exfat::file_directory_entry_t *fde) :
+        _offset(offset), _fde(fde), _parent(nullptr) {
+            _streamext = (exfat::stream_extension_entry_t*)(fde+1);
+            _nameent = (exfat::file_name_entry_t*)(fde+2);
+        }
+
     virtual ~Entity() {}
-    virtual std::string get_name() const { return "Entity"; }
-    virtual Entity * get_parent() const { return nullptr; }
-    virtual void set_parent(Entity *parent) {}
-    virtual void add_child(Entity *child) {}
-    virtual std::optional<std::unordered_set<Entity*>> get_children() const { return std::nullopt; }
+    virtual std::streamoff get_offset() const { return _offset; }
+    virtual std::string get_name() const { return _name; }
+    virtual Entity * get_parent() const { return _parent; }
+    virtual void set_parent(Entity *parent) { _parent = parent; }
+
+    virtual Entity * load_name() {
+        _name = get_utf8_filename(_fde, _streamext);
+        return this; //convenience
+    }
+
+public: // can't deal
+    std::string _name;
+    std::streamoff _offset;
+    exfat::file_directory_entry_t *_fde;
+    exfat::stream_extension_entry_t *_streamext;
+    exfat::file_name_entry_t *_nameent;
+    Entity *_parent;
 };
+
 class File:public Entity{
 public:
-    std::string name;
-    Entity *parent;
-
+    File(std::streamoff offset, exfat::file_directory_entry_t *fde) : Entity(offset, fde) {}
     virtual ~File() {}
-    virtual std::string get_name() const { return name; }
-    virtual Entity * get_parent() const { return parent; }
-    virtual void set_parent(Entity *parent) {this->parent = parent;}
-    virtual void add_child(Entity *child) {}
-    virtual std::optional<std::unordered_set<Entity*>> get_children() const { return std::nullopt; }
+    bool is_contiguous() const {
+        return _streamext->flags & exfat::CONTIGUOUS;
+    }
 };
+
 class Directory:public Entity{
 public:
-    std::string name;
-    Entity *parent;
-    std::unordered_set<Entity*> children;
-
+    Directory(std::streamoff offset, exfat::file_directory_entry_t *fde) : Entity(offset, fde) {
+    }
     virtual ~Directory() {}
-    virtual std::string get_name() const { return name; }
-    virtual Entity * get_parent() const { return parent; }
-    virtual void set_parent(Entity *parent) {this->parent = parent;}
-    virtual void add_child(Entity *child) {child->set_parent(this); this->children.insert(child);}
-    virtual std::optional<std::unordered_set<Entity*>> get_children() const { return std::make_optional(children); }
+
+    virtual void add_child(Entity *child) {
+        child->set_parent(this);
+        this->children.push_back(child);
+    }
+    virtual const std::vector<Entity*>& get_children() const { return children; }
+private:
+    std::vector<Entity*> children;
 };
+
+Entity * make_entity(std::streamoff offset, exfat::file_directory_entry_t *fde) {
+    if (fde->attributes & exfat::DIRECTORY) {
+        return (new Directory(offset, fde))->load_name();
+    } else {
+        return (new File(offset, fde))->load_name();
+    }
+}
 
 using namespace github::paulyc::resurrExion;
 
@@ -107,12 +163,22 @@ class FilesystemStub
 public:
     FilesystemStub():
         _fd(-1),
-        _mmap((uint8_t*)MAP_FAILED)
+        _mmap((uint8_t*)MAP_FAILED),
+        _partition_start(nullptr),
+        _partition_end(nullptr)
     {
+        _invalid_file_name_characters = {'"', '*', '/', ':', '<', '>', '?', '\\', '|'};
+        for (char16_t ch = 0; ch <= 0x001F; ++ch) {
+            _invalid_file_name_characters.push_back(ch);
+        }
+    }
+
+    void open(std::string devpath) {
         const bool write_changes = false;
         const int oflags = write_changes ? O_RDWR | O_DSYNC | O_RSYNC : O_RDONLY;
-        _fd = open("/dev/disk2", oflags);
+        _fd = ::open(devpath.c_str(), oflags);
         if (_fd == -1) {
+            std::cerr << "failed to open device " << devpath << std::endl;
             throw std::system_error(std::error_code(errno, std::system_category()));
         }
 
@@ -120,37 +186,39 @@ public:
         const int mflags = write_changes ? MAP_SHARED : MAP_PRIVATE;
         _mmap = (uint8_t*)mmap(0, DiskSize, mprot, mflags, _fd, 0);
         if (_mmap == (uint8_t*)MAP_FAILED) {
-            //throw std::system_error(std::error_code(errno, std::system_category()));
             std::cerr << "error opening mmap" << std::endl;
-            return;
+            throw std::system_error(std::error_code(errno, std::system_category()));
         }
 
-        _partition_start = _mmap + PartitionStartSector * SectorSize;
-        _partition_end = _partition_start + (NumSectors + 1) * SectorSize;
-       // _fs = (exfat::filesystem_t<SectorSize, SectorsPerCluster, NumSectors>*)_partition_start;
+         _partition_start = _mmap + PartitionStartSector * SectorSize;
+         _partition_end = _partition_start + (NumSectors + 1) * SectorSize;
+    }
 
-        _invalid_file_name_characters = {'"', '*', '/', ':', '<', '>', '?', '\\', '|'};
-        for (char16_t ch = 0; ch <= 0x001F; ++ch) {
-            _invalid_file_name_characters.push_back(ch);
+    void close() {
+        _partition_end = nullptr;
+        _partition_start = nullptr;
+
+        if (_mmap != MAP_FAILED) {
+            munmap(_mmap, DiskSize);
+            _mmap = (uint8_t*)MAP_FAILED;
+        }
+
+        if (_fd != -1) {
+            ::close(_fd);
+            _fd = -1;
         }
     }
 
     ~FilesystemStub()
     {
-        if (_mmap != MAP_FAILED) {
-            munmap(_mmap, DiskSize);
-        }
-
-        if (_fd != -1) {
-            close(_fd);
-        }
-    }
-    void cb(std::streamoff offset, Entity *ent, std::optional<std::exception> except) {
-        
+        close();
     }
 
     void parseTextLog(const std::string &filename)
     {
+        std::unordered_map<Entity*, Entity*> child_to_parent;
+        std::unordered_map<Entity*, std::streamoff> entity_to_offset;
+
         std::regex fde("FDE ([0-9a-fA-F]{16})(?: (.*))?");
         std::regex badsector("BAD_SECTOR ([0-9a-fA-F]{16})");
         std::ifstream logfile(filename);
@@ -166,45 +234,47 @@ public:
                 filename = sm[2];
                 try {
                     offset = std::stol(sm[1], nullptr, 16);
-                    Entity * ent = loadEntityOffset(offset, nullptr);
-                    cb(offset, ent, std::nullopt);
+                    Entity * ent = loadEntityOffset(offset);
+                    _entities_to_offsets[ent] = offset;
+                    _offsets_to_entities[offset] = ent;
                 } catch (std::exception &ex) {
                     std::cerr << "Writing file entry to binlog, got exception: " << typeid(ex).name() << " with msg: " << ex.what() << std::endl;
                     std::cerr << "Invalid textlog FDE line, skipping: " << line << std::endl;
-                    cb(0, nullptr, std::make_optional(ex));
                 }
             } else if (std::regex_match(line, sm, badsector)) {
                 std::streamoff offset;
                 try {
                     offset = std::stol(sm[1], nullptr, 16);
-                    cb(offset, nullptr, std::nullopt);
+                    std::cerr << "Noted bad sector at offset " << offset << std::endl;
                 } catch (std::exception &ex) {
                     std::cerr << "Writing bad sector to binlog, got exception " << typeid(ex).name() << " with msg: " << ex.what() << std::endl;
                     std::cerr << "Invalid textlog BAD_SECTOR line, skipping: " << line << std::endl;
-                    cb(0, nullptr, std::make_optional(ex));
                 }
             } else {
                 std::cerr << "Unknown textlog line format: " << line << std::endl;
-                cb(0, nullptr, std::make_optional(std::exception()));
             }
         }
     }
 
     void find_orphans() {
+        std::cerr << "find_orphans" << std::endl;
         FILE *orphanlog = fopen("/Users/paulyc/Development/resurrExion/orphan.log", "w");
-        for (auto & [ entry_ptr, entity ] : _offset_to_entity_mapping) {
-            if (entity->get_parent() == nullptr) {
-                fprintf(orphanlog, "ORPHAN %016lld %s", entry_ptr, entity->get_name().c_str());
+        for (auto it = _offsets_to_entities.begin(); it != _offsets_to_entities.end(); ++it) {
+            const std::streamoff offset = it->first;
+            const Entity *ent = it->second;
+            if (ent->get_parent() == nullptr) {
+                fprintf(orphanlog, "ORPHAN %016lld %s", offset, ent->get_name().c_str());
             }
         }
         fclose(orphanlog);
     }
 
-    Entity * loadEntityOffset(std::streamoff entity_offset, Entity * parent) {
-        return loadEntity(_mmap + entity_offset, parent);
+    Entity * loadEntityOffset(std::streamoff entity_offset) {
+        //fprintf(stderr, "loadEntityOffset[%016lld]\n", entity_offset);
+        return loadEntity(entity_offset, _mmap + entity_offset);
     }
 
-    Entity * loadEntity(uint8_t *entity_start, Entity * parent)
+    Entity * loadEntity(std::streamoff offset, uint8_t *entity_start)
     {
         exfat::file_directory_entry_t *fde = (exfat::file_directory_entry_t*)(entity_start);
         exfat::stream_extension_entry_t *streamext = (exfat::stream_extension_entry_t*)(entity_start+32);
@@ -235,110 +305,38 @@ public:
         }
 
         if (chksum != fde->checksum) {
-            fprintf(stderr, "bad file entry checksum at offset %016llx\n", entity_start - _mmap);
+            fprintf(stderr, "bad file entry checksum at offset %016llx\n", offset);
             return nullptr;
         }
 
-        std::basic_string<char16_t> u16s;
-        std::string utf8_name;
-        int namelen = streamext->name_length;
-        for (int c = 0; c <= continuations - 2; ++c) {
-            if (n[c].type == exfat::FILE_NAME) {
-                for (int i = 0; i < sizeof(n[c].name); ++i) {
-                    if (u16s.length() == namelen) {
-                        break;
-                    } else {
-                        u16s.push_back(n[c].name[i]);
-                    }
-                }
-            }
-        }
-        if (u16s.length() != namelen) {
-            fprintf(stderr, "u16s.length() != namelen for entity at offset %016llx\n", entity_start - _mmap);
-        }
-        utf8_name = _cvt.to_bytes(u16s);
-
-        // load parents and children here.....
-        // orphan entities we will just stick in the root eventually ....
-        //std::shared_ptr<BaseEntity> entity;
-        // first see if we already loaded this entity
-        std::unordered_map<std::streamoff, Entity*>::iterator entityit =
-            _offset_to_entity_mapping.find(entity_start - _mmap);
-        if (entityit != _offset_to_entity_mapping.end()) {
-            if (entityit->second->get_parent() == nullptr) {
-                if (parent != nullptr) {
-                    entityit->second->set_parent(parent);// = parent;
-                }
-            } else {
-                if (parent != nullptr) {
-                    fprintf(stderr, "entity at offset %016llx already has a parent\n", entity_start - _mmap);
-                }
-            }
-            return entityit->second;
-        }
-
-        if (fde->attributes & exfat::DIRECTORY) {
-            exfat::file_directory_entry_t *fde = (exfat::file_directory_entry_t *)entity_start;
-            Directory *d = new Directory;
-            d->name = utf8_name;
-            d->parent = parent;
-            loadDirectory(d, fde, continuations + 1);
-
-            //std::make_shared<DirectoryEntity>(entity_start, continuations + 1, parent, utf8_name);
-            _offset_to_entity_mapping[entity_start - _mmap] = d;
-            return d;
-        } else {
-            File *f = new File;
-            f->name = utf8_name;
-            f->parent = parent;
-            _offset_to_entity_mapping[entity_start - _mmap] = f;
-            return f;
-        }
+        return make_entity(offset, fde);
     }
 
-    std::unordered_map<std::streamoff, Entity*> _offset_to_entity_mapping;
-
-    void loadDirectory(Directory *d, exfat::file_directory_entry_t *fde, int num_entries)
-    {
-        const uint32_t start_cluster = ((exfat::stream_extension_entry_t*)(fde + 1))->first_cluster;
-        exfat::metadata_entry_u *dirent;
+    void load_directory(std::streamoff offset, Directory *d) {
+        const uint32_t start_cluster = d->_streamext->first_cluster;
+        const uint8_t num_entries = d->_fde->continuations + 1;
+        exfat::metadata_entry_u *dirent = nullptr;
         if (start_cluster == 0) {
             // directory children immediately follow
-            dirent = (exfat::metadata_entry_u *)(fde + num_entries);
+            dirent = (exfat::metadata_entry_u *)(d->_fde + num_entries);
+            offset += sizeof(d->_fde) * num_entries;
         } else {
-            fprintf(stderr, "PANIC!\n");
-            throw std::exception();
-            //dirent = (exfat::metadata_entry_u *)_fs->data_region.cluster_heap.storage[start_cluster].sectors[0].data;
+            fprintf(stderr, "SKETCH!\n");
+            //throw std::exception();
+            const size_t cluster_heap_start_byte_offset = 0x283D8 * 512;
+            my_cluster *c = (my_cluster*)(_mmap + cluster_heap_start_byte_offset);
+            dirent = (exfat::metadata_entry_u*)(c+start_cluster);
+            offset = (uint8_t*)dirent - _mmap;
         }
 
-        const uint8_t num_secondary_entries = ((exfat::primary_directory_entry_t*)dirent)->secondary_count;
+        const uint8_t num_secondary_entries = dirent->primary_directory_entry.secondary_count;
         for (uint8_t secondary_entry = 0; secondary_entry < num_secondary_entries; ++secondary_entry) {
-            Entity *child = this->loadEntity((uint8_t*)dirent, d);
-            d->add_child(child);
+            Entity *child = make_entity(offset, &dirent->file_directory_entry);
             child->set_parent(d);
-#warning not done
-            dirent += 0;//child->get_num_entries();
+            d->add_child(child);
+            dirent += child->_fde->continuations + 1;
+            offset += sizeof(exfat::metadata_entry_u) * (child->_fde->continuations + 1);
         }
-    }
-
-    std::string _get_utf8_filename(exfat::file_directory_entry_t *fde, struct exfat::stream_extension_entry_t *sde)
-    {
-        const int continuations = fde->continuations;
-        const int namelen = sde->name_length;
-        std::basic_string<char16_t> u16s;
-        for (int c = 2; c <= continuations; ++c) {
-            exfat::file_name_entry_t *n = (exfat::file_name_entry_t *)(((uint8_t*)fde) + c*32);
-            if (n->type == exfat::FILE_NAME) {
-                for (int i = 0; i < sizeof(n->name); ++i) {
-                    if (u16s.length() == namelen) {
-                        return _cvt.to_bytes(u16s);
-                    } else {
-                        u16s.push_back((char16_t)n->name[i]);
-                    }
-                }
-            }
-        }
-        return _cvt.to_bytes(u16s);
     }
 
     int      _fd;
@@ -346,72 +344,15 @@ public:
     uint8_t *_partition_start;
     uint8_t *_partition_end;
     std::vector<char16_t> _invalid_file_name_characters;
-    std::wstring_convert<std::codecvt_utf8_utf16<char16_t>, char16_t> _cvt;
+    std::unordered_map<Entity*, std::streamoff> _entities_to_offsets;
+    std::unordered_map<std::streamoff, Entity*> _offsets_to_entities;
 };
 
 int main(int argc, char *argv[]) {
-    std::unordered_map<Entity*, Entity*> child_to_parent;
-    std::unordered_map<Entity*, std::streamoff> entity_to_offset;
-
-    //if (argc != 3) {
-    //    fprintf(stderr, "wrong args\n");
-    //    return 1;
-    //}
-
-    //filesystem_t fs("/dev/disk2", DiskSize, PartitionStartSector, false);
-    //fs.init_metadata();
-
-    FilesystemStub log;
-    log.parseTextLog("/Users/paulyc/Development/resurrExion/recovery.log");
-#if 0
-    , [](std::streamoff offset, entity_t ent, std::optional<std::exception> except){
-        // go through the log, add every file, update directory children,
-        // anything left with no parent goes in lost+found
-        if (except.has_value()) {
-            const std::exception &ex = except.value();
-            fprintf(stderr, "[WARN] entry_info had exception type %s with message %s\n", typeid(ex).name(), ex.what());
-        } else if (ent != nullptr) {
-            switch (ent->get_type()) {
-            case BaseEntity::File:
-            {
-                std::shared_ptr<FileEntity> f = std::dynamic_pointer_cast<FileEntity>(ent);
-                if (!f) {
-                    fprintf(stderr, "[WARN] Invalid file entry at offset %016llx\n", offset);
-                    return;
-                }
-                /*if (entity_to_offset.find(ent) != entity_to_offset.end()) {
-                    fprintf(stderr, "[WARN] %016lx [%s] already in offset_to_entity\n", offset, ent->get_name().c_str());
-                    return;
-                }
-                entity_to_offset[ent] = offset;
-                if (child_to_parent.find(ent) == child_to_parent.end()) {
-                    child_to_parent[ent] = nullptr;
-                    return;
-                }*/
-                break;
-            }
-            case BaseEntity::Directory:
-            {
-                std::shared_ptr<DirectoryEntity> d = std::dynamic_pointer_cast<DirectoryEntity>(ent);
-                if (!d) {
-                    fprintf(stderr, "[WARN] Invalid directory entry at offset %016llx\n", offset);
-                    return;
-                }
-                /*for (auto &child: d->get_children()) {
-                    child_to_parent[child] = ent;
-                }*/
-                break;
-            }
-            default:
-                fprintf(stderr, "[WARN] Unknown entity type\n");
-                break;
-            }
-        } else {
-            // Bad sector, mark it in the fat
-        }
-    });
-#endif
-
-
+    FilesystemStub stub;
+    stub.open("/dev/disk2");
+    stub.parseTextLog("/Users/paulyc/Development/resurrExion/recovery.log");
+    stub.find_orphans();
+    stub.close();
     return 0;
 }
