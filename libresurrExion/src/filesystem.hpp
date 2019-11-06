@@ -28,7 +28,16 @@
 #ifndef _github_paulyc_filesystem_hpp_
 #define _github_paulyc_filesystem_hpp_
 
-#include <cstdint>
+#include <stdint.h>
+#include <stddef.h>
+#include <stdlib.h>
+#include <xlocale.h>
+#include <assert.h>
+#include <sys/mman.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <unistd.h>
+
 #include <variant>
 #include <memory>
 #include <fstream>
@@ -43,16 +52,6 @@
 
 #include "exception.hpp"
 #include "recoverylog.hpp"
-#include "logger.hpp"
-#include "exfat_structs.hpp"
-#include "entity.hpp"
-
-#include <stddef.h>
-#include <assert.h>
-#include <sys/mman.h>
-#include <sys/stat.h>
-#include <fcntl.h>
-#include <unistd.h>
 
 #ifndef O_RSYNC
 #define O_RSYNC O_SYNC

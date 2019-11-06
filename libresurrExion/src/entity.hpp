@@ -84,7 +84,9 @@ public:
     void set_parent(std::shared_ptr<BaseEntity> parent) {
         _parent = parent;
     }
-    virtual Type get_type() const = 0;
+    virtual Type get_type() const {
+        return Unknown;
+    }
 
 protected:
     exfat::metadata_entry_u *_fs_entries;
@@ -102,7 +104,9 @@ public:
     bool is_contiguous() const {
         return (this->_fs_entries + 1)->stream_extension_entry.flags & exfat::CONTIGUOUS;
     }
-    virtual Type get_type() const;
+    virtual Type get_type() const {
+        return File;
+    }
 };
 
 class DirectoryEntity : public BaseEntity
@@ -119,7 +123,9 @@ public:
 
     void add_child(std::shared_ptr<BaseEntity> child) { _children.push_back(child); }
     const std::list<std::shared_ptr<BaseEntity>> &get_children() const { return _children; }
-    virtual Type get_type() const;
+    virtual Type get_type() const{
+        return Directory;
+    }
 protected:
     std::list<std::shared_ptr<BaseEntity>> _children;
 };
@@ -129,7 +135,9 @@ class RootDirectoryEntity : public DirectoryEntity
 public:
     RootDirectoryEntity(void *entry_start) : DirectoryEntity(entry_start, 0, nullptr, "ROOT") {}
 
-    virtual Type get_type() const;
+    virtual Type get_type() const{
+        return RootDirectory;
+    }
 };
 
 } /* namespace resurrExion */

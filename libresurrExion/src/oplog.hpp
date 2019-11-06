@@ -1,8 +1,8 @@
 //
-//  entity.cpp - File/Directory Entity on Disk
+//  oplog.hpp
 //  resurrExion
 //
-//  Created by Paul Ciarlo on 11/5 (5 Nov) 2019.
+//  Created by Paul Ciarlo on 10/15/19.
 //
 //  Copyright (C) 2019 Paul Ciarlo <paul.ciarlo@gmail.com>.
 //
@@ -25,18 +25,9 @@
 //  SOFTWARE.
 //
 
-#include "entity.hpp"
+#ifndef oplog_hpp
+#define oplog_hpp
 
-using namespace github::paulyc::resurrExion;
+#include <stdio.h>
 
-BaseEntity::Type FileEntity::get_type() const {
-    return File;
-}
-
-BaseEntity::Type DirectoryEntity::get_type() const {
-    return Directory;
-}
-
-BaseEntity::Type RootDirectoryEntity::get_type() const {
-    return RootDirectory;
-}
+#endif /* oplog_hpp */

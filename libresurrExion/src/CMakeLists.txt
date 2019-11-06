@@ -34,19 +34,14 @@ set(LIB_HEADERS
 	circbuf.hpp
 )
 
-set(LIB_COMPILE_SOURCES
-	journal.cpp
-	logger.cpp
-	entity.cpp
-)
+#set(LIB_COMPILE_SOURCES)
 
 add_library(
 	resurrExion
-	SHARED
-	${LIB_HEADERS}
-	${LIB_COMPILE_SOURCES}
+	INTERFACE
 )
+#	${LIB_COMPILE_SOURCES}
 
 #set_source_files_properties(${LIB_HEADERS} PROPERTIES HEADER_FILE_ONLY TRUE)
-target_include_directories(resurrExion PUBLIC ../config .)
-target_link_libraries(resurrExion)
+#target_include_directories(resurrExion PUBLIC ../config .)
+#target_link_libraries(resurrExion)
