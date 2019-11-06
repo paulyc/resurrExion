@@ -28,8 +28,6 @@
 #include <iostream>
 #include <string>
 
-#include <boost/program_options.hpp>
-
 #include "filesystem.hpp"
 #include "../config/fsconfig.hpp"
 
@@ -54,6 +52,7 @@ struct Options
 };
 
 int main(int argc, const char * argv[]) {
+#if 0
     namespace poptions = boost::program_options;
     poptions::options_description optdesc("Allowed options");
     optdesc.add_options()
@@ -66,7 +65,7 @@ int main(int argc, const char * argv[]) {
     clparser.positional(p);
     poptions::store(clparser.run(), varmap);
     poptions::notify(varmap);
-
+#endif
 #if 1
     if (argc != 2) {
         std::cerr << "usage: " << argv[0] << " <device>" << std::endl;

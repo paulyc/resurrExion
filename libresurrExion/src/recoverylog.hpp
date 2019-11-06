@@ -28,6 +28,14 @@
 #ifndef _github_paulyc_recoverylog_hpp_
 #define _github_paulyc_recoverylog_hpp_
 
+#include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
+#include <xlocale.h>
+
+#include <sys/mman.h>
+#include <unistd.h>
+
 #include <string>
 #include <fstream>
 #include <functional>
@@ -39,11 +47,6 @@
 #include <sstream>
 #include <iomanip>
 #include <regex>
-#include <cstdio>
-#include <cstring>
-
-#include <sys/mman.h>
-#include <unistd.h>
 
 #include "logger.hpp"
 #include "entity.hpp"
@@ -64,7 +67,7 @@ public:
     typedef std::shared_ptr<BaseEntity> Entity_T;
 
     RecoveryLog() = default;
-    ~RecoveryLog() = default;
+    ~RecoveryLog() {}
 
     void parseTextLog(const std::string &filename, Filesystem_T &fs,
                       std::function<void(std::streamoff, Entity_T, std::optional<std::exception>)> cb)

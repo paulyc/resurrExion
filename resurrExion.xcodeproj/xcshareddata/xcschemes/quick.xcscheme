@@ -14,9 +14,9 @@
             buildForAnalyzing = "YES">
             <BuildableReference
                BuildableIdentifier = "primary"
-               BlueprintIdentifier = "5FA2AC23232A9A71007A8482"
-               BuildableName = "libresurrExion.dylib"
-               BlueprintName = "resurrExion"
+               BlueprintIdentifier = "5F798B342372476C007A8482"
+               BuildableName = "quick"
+               BlueprintName = "quick"
                ReferencedContainer = "container:resurrExion.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
@@ -40,15 +40,16 @@
       debugDocumentVersioning = "YES"
       debugServiceExtension = "internal"
       allowLocationSimulation = "YES">
-      <MacroExpansion>
+      <BuildableProductRunnable
+         runnableDebuggingMode = "0">
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "5FA2AC23232A9A71007A8482"
-            BuildableName = "libresurrExion.dylib"
-            BlueprintName = "resurrExion"
+            BlueprintIdentifier = "5F798B342372476C007A8482"
+            BuildableName = "quick"
+            BlueprintName = "quick"
             ReferencedContainer = "container:resurrExion.xcodeproj">
          </BuildableReference>
-      </MacroExpansion>
+      </BuildableProductRunnable>
    </LaunchAction>
    <ProfileAction
       buildConfiguration = "Release"
@@ -56,15 +57,16 @@
       savedToolIdentifier = ""
       useCustomWorkingDirectory = "NO"
       debugDocumentVersioning = "YES">
-      <MacroExpansion>
+      <BuildableProductRunnable
+         runnableDebuggingMode = "0">
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "5FA2AC23232A9A71007A8482"
-            BuildableName = "libresurrExion.dylib"
-            BlueprintName = "resurrExion"
+            BlueprintIdentifier = "5F798B342372476C007A8482"
+            BuildableName = "quick"
+            BlueprintName = "quick"
             ReferencedContainer = "container:resurrExion.xcodeproj">
          </BuildableReference>
-      </MacroExpansion>
+      </BuildableProductRunnable>
    </ProfileAction>
    <AnalyzeAction
       buildConfiguration = "Debug">

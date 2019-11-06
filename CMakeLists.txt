@@ -32,10 +32,8 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_C_STANDARD 11)
 
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -D_DEBUG=1 -g -std=c11")
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -D_DEBUG=1 -g -std=c++17")
-
-find_package(Boost 1.69.0 REQUIRED system date_time unit_test_framework program_options)
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -D_DEBUG=1 -g")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -D_DEBUG=1 -g")
 
 add_subdirectory(libresurrExion)
 add_subdirectory(resurrEx)
