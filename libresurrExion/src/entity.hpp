@@ -102,7 +102,7 @@ public:
         BaseEntity(entry_start, num_entries, parent, name) {}
 
     bool is_contiguous() const {
-        return (this->_fs_entries + 1)->stream_extension_entry.flags & exfat::CONTIGUOUS;
+        return (this->_fs_entries + 1)->stream_extension_entry.flags & exfat::NO_FAT_CHAIN;
     }
     virtual Type get_type() const {
         return File;

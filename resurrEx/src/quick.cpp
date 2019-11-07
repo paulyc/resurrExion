@@ -60,34 +60,50 @@ using namespace github::paulyc::resurrExion;
 
 typedef uint8_t my_cluster[512*512];
 
-constexpr static size_t SectorSize = 512;
-constexpr static size_t SectorsPerCluster = 512;
-constexpr static size_t NumSectors = 7813560247;
-constexpr static size_t ClustersInFat = (NumSectors - 0x283D8) / 512;
-constexpr static size_t PartitionStartSector = 0x64028;
+constexpr static size_t SectorSize             = 512;
+constexpr static size_t SectorsPerCluster      = 512;
+constexpr static size_t NumSectors             = 7813560247;
+constexpr static size_t ClustersInFat          = (NumSectors - 0x283D8) / 512;
+constexpr static size_t PartitionStartSector   = 0x64028;
 constexpr static size_t ClusterHeapStartSector = 0x283D8; // relative to partition start
-constexpr static size_t ClusterHeapStartSectorRelWholeDisk = PartitionStartSector + ClusterHeapStartSector; // relative to partition start
-constexpr static size_t DiskSize = (NumSectors + PartitionStartSector) * SectorSize;
+constexpr static size_t ClusterHeapStartSectorRelWholeDisk = PartitionStartSector + ClusterHeapStartSector;
+constexpr static size_t ClusterHeapStartOffset = ClusterHeapStartSectorRelWholeDisk * SectorSize;
+constexpr static size_t DiskSize               = (NumSectors + PartitionStartSector) * SectorSize;
 
 namespace {
     std::wstring_convert<std::codecvt_utf8_utf16<char16_t>, char16_t> cvt;
 }
 
-// this is broken.. need to look at the spec..
+bool is_valid_filename_char(char16_t ch) {
+    switch (ch) {
+    case '\'':
+    case '*':
+    case '/':
+    case ':':
+    case '<':
+    case '>':
+    case '?':
+    case '\\':
+    case '|':
+        return false;
+    default:
+        return ch >= 0x0020;
+    }
+}
+
 std::string get_utf8_filename(exfat::file_directory_entry_t *fde, struct exfat::stream_extension_entry_t *sde)
 {
     const size_t entry_count = fde->continuations + 1;
     // i dont know that this means anything without decoding the string because UTF-16 is so dumb re: the "emoji problem"
     const size_t namelen = sde->name_length;
-    struct exfat::file_name_entry_t *n = (struct exfat::file_name_entry_t*)(sde+1);
+    struct exfat::file_name_entry_t *n = (struct exfat::file_name_entry_t*)fde;
     std::basic_string<char16_t> u16s;
     for (size_t c = 2; c < entry_count && u16s.length() <= namelen; ++c) {
-        if (n->type == exfat::FILE_NAME || n->type == exfat::FILE_TAIL) {
+        if (n[c].type == exfat::FILE_NAME) {
             for (size_t i = 0; i < exfat::file_name_entry_t::FS_FILE_NAME_ENTRY_SIZE && u16s.length() <= namelen; ++i) {
-                u16s.push_back((char16_t)n->name[i]);
+                u16s.push_back((char16_t)n[c].name[i]);
             }
         }
-        ++n;
     }
     return cvt.to_bytes(u16s);
 }
@@ -97,7 +113,9 @@ class Entity;
 Entity * make_entity(std::streamoff offset, exfat::file_directory_entry_t *fde, const char *suggested_name);
 
 std::streamoff cluster_number_to_offset(uint32_t cluster) {
-    return (cluster * SectorsPerCluster + ClusterHeapStartSectorRelWholeDisk) * SectorSize;
+    // have to subtract 2 because the first cluster in the cluster heap has index 2 and
+    // by my definition the cluster heap simply starts there
+    return ((cluster) * SectorsPerCluster + ClusterHeapStartSectorRelWholeDisk) * SectorSize;
 }
 
 class Entity{
@@ -106,6 +124,21 @@ public:
         _offset(offset), _fde(fde), _parent(nullptr) {
             _streamext = (exfat::stream_extension_entry_t*)(fde+1);
             _nameent = (exfat::file_name_entry_t*)(fde+2);
+            _alloc_possible = _streamext->flags & exfat::ALLOCATION_POSSIBLE;
+            _contiguous = _streamext->flags & exfat::NO_FAT_CHAIN;
+            if (_alloc_possible) {
+                _first_cluster = _streamext->first_cluster;
+                _data_length = _streamext->valid_size;
+                if (_first_cluster == 0) {
+                    _data_offset = offset + (_fde->continuations + 1)*sizeof(exfat::file_directory_entry_t);
+                } else {
+                    _data_offset = cluster_number_to_offset(_first_cluster);
+                }
+            } else {
+                // FirstCluster and DataLength are undefined
+                _first_cluster = 0;
+                _data_length = 0;
+            }
         }
 
     virtual ~Entity() {}
@@ -126,57 +159,84 @@ public:
         return this; //convenience
     }
 
-public: // can't deal
+    virtual uint32_t get_first_cluster() const {
+        return _first_cluster;
+    }
+
+    virtual uint64_t get_data_length() const {
+        return _data_length;
+    }
+
+    virtual std::streamoff get_data_offset() const {
+        return _data_offset;
+    }
+
+    virtual bool is_contiguous() const {
+        return _contiguous;
+    }
+
+    virtual bool is_alloc_possible() const {
+        return _alloc_possible;
+    }
+
+public:
     std::string _name;
     std::streamoff _offset;
     exfat::file_directory_entry_t *_fde;
     exfat::stream_extension_entry_t *_streamext;
     exfat::file_name_entry_t *_nameent;
     Entity *_parent;
+    bool _alloc_possible;
+    bool _contiguous;
+    uint32_t _first_cluster;
+    std::streamoff _data_offset;
+    uint64_t _data_length;
 };
 
 class File:public Entity{
 public:
     File(std::streamoff offset, exfat::file_directory_entry_t *fde) : Entity(offset, fde) {
-        _contiguous = _streamext->flags & exfat::CONTIGUOUS;
-        _first_cluster = _streamext->first_cluster;
-        if (_first_cluster == 0) {
-            _data_offset = offset + (_fde->continuations + 1)*sizeof(exfat::file_directory_entry_t);
-        } else {
-            _data_offset = cluster_number_to_offset(_first_cluster);
-        }
     }
     virtual ~File() {}
-    bool is_contiguous() const {
-        return _contiguous;
-    }
-    uint32_t get_first_cluster() const {
-        return _first_cluster;
-    }
-    std::streamoff get_data_offset() const {
-        return _data_offset;
-    }
-    bool _contiguous;
-    uint32_t _first_cluster;
-    std::streamoff _data_offset;
 };
 
 class Directory:public Entity{
 public:
     Directory(std::streamoff offset, exfat::file_directory_entry_t *fde) : Entity(offset, fde) {
+       // _num_secondary_entries = fde->primary_directory_entry.secondary_count;
+        _pde = (struct exfat::primary_directory_entry_t*)fde;
+        _num_secondary_entries = _pde->secondary_count;
+#if 0
+        think i have to lookup this offset out of the cluster heap
+        struct exfat::secondary_directory_entry_t *sde = nullptr; //= (struct exfat::secondary_directory_entry_t*)fde+1;
+        std::basic_string<char16_t> u16s;
+        for (size_t c = 2; c < _num_secondary_entries && u16s.length() <= namelen; ++c) {
+            if (n[c].type == exfat::FILE_NAME) {
+                for (size_t i = 0; i < exfat::file_name_entry_t::FS_FILE_NAME_ENTRY_SIZE && u16s.length() <= namelen; ++i) {
+                    u16s.push_back((char16_t)n[c].name[i]);
+                }
+            }
+        }
+#endif
     }
     virtual ~Directory() {}
+    virtual uint8_t get_num_secondary_entries() const {
+        return _num_secondary_entries;
+    }
     virtual void add_child(Entity *child) {
         child->set_parent(this);
-        this->children.push_back(child);
+        this->_children.push_back(child);
     }
-    virtual const std::vector<Entity*>& get_children() const { return children; }
+    virtual const std::vector<Entity*>& get_children() const { return _children; }
 private:
-    std::vector<Entity*> children;
+    struct exfat::primary_directory_entry_t *_pde;
+    uint8_t _num_secondary_entries;
+    std::vector<struct exfat::secondary_directory_entry_t> _child_entries;
+    std::vector<Entity*> _children;
 };
 
 Entity * make_entity(std::streamoff offset, exfat::file_directory_entry_t *fde, const std::string &suggested_name) {
-    if (fde->attributes & exfat::DIRECTORY) {
+    if (fde->attribute_flags & exfat::DIRECTORY) {
         return (new Directory(offset, fde))->load_name(suggested_name);
     } else {
         return (new File(offset, fde))->load_name(suggested_name);
@@ -243,8 +303,8 @@ public:
 
     void parseTextLog(const std::string &filename)
     {
-        std::unordered_map<Entity*, Entity*> child_to_parent;
-        std::unordered_map<Entity*, std::streamoff> entity_to_offset;
+        //std::unordered_map<Entity*, Entity*> child_to_parent;
+        //std::unordered_map<Entity*, std::streamoff> entity_to_offset;
 
         std::regex fde("FDE ([0-9a-fA-F]{16}) (.*)");
         std::regex badsector("BAD_SECTOR ([0-9a-fA-F]{16})");
@@ -263,8 +323,7 @@ public:
                     offset = std::stol(sm[1], nullptr, 16);
                     Entity * ent = loadEntityOffset(offset, filename);
                     printf("%016lx %s\n", ent->get_offset(), ent->get_name().c_str());
-                    _entities_to_offsets[ent] = offset;
-                    _offsets_to_entities[offset] = ent;
+
                 } catch (std::exception &ex) {
                     std::cerr << "Writing file entry to binlog, got exception: [" << typeid(ex).name() << "] with msg: " << ex.what() << std::endl;
                     std::cerr << "Invalid textlog FDE line, skipping: " << line << std::endl;
@@ -355,30 +414,22 @@ public:
             return nullptr;
         }
 
-        return make_entity(offset, fde, suggested_name);
+        Entity *ent = make_entity(offset, fde, suggested_name);
+        _entities_to_offsets[ent] = offset;
+        _offsets_to_entities[offset] = ent;
+        if (typeid(*ent) == typeid(Directory)) {
+            //this->load_directory(dynamic_cast<Directory*>(ent));
+        }
+        return ent;
     }
 
-    void load_directory(std::streamoff offset, Directory *d) {
+    void load_directory(Directory *d) {
+        printf("load_directory ");
         const uint32_t start_cluster = d->_streamext->first_cluster;
         const uint8_t num_entries = d->_fde->continuations + 1;
-        exfat::metadata_entry_u *dirent = nullptr;
-        if (start_cluster == 0) {
-            // directory children immediately follow
-            dirent = (exfat::metadata_entry_u *)(d->_fde + num_entries);
-            offset = (uint8_t*)dirent - _mmap;
-        } else {
-            fprintf(stderr, "SKETCH!\n");
-            offset = cluster_number_to_offset(start_cluster);
-            dirent = (exfat::metadata_entry_u*)(_mmap+offset);
-        }
-#warning this is all broken
-        const uint8_t num_secondary_entries = dirent->primary_directory_entry.secondary_count;
-        for (uint8_t secondary_entry = 0; secondary_entry < num_secondary_entries; ++secondary_entry) {
-            Entity *child = make_entity(offset, &dirent->file_directory_entry, std::string());
-            d->add_child(child);
-            dirent += child->_fde->continuations + 1;
-            offset += sizeof(exfat::metadata_entry_u) * (child->_fde->continuations + 1);
-        }
+        std::streamoff offset = d->get_data_offset();
+        const struct exfat::secondary_directory_entry_t *dirent = (struct exfat::secondary_directory_entry_t *)(_mmap + offset) + 2;
+        printf(" got %lu children\n", d->get_children().size());
     }
 
     int      _fd;

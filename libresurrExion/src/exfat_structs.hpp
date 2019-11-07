@@ -50,6 +50,13 @@ enum AttributeFlags {
     ARCH        = 1<<5
 };
 
+enum EntryTypeFlags {
+    TYPE_CODE       = 1<<0,
+    TYPE_IMPORTANCE = 1<<5,
+    TYPE_CATEGORY   = 1<<6,
+    IN_USE          = 1<<7
+};
+
 struct bios_parameter_block {
 } __attribute__((packed));
 
@@ -153,45 +160,27 @@ struct timestamp {
     uint8_t year[7];
 } __attribute__((packed));
 
-struct file_attributes {
-    uint8_t read_only;      // 1 = read only
-    uint8_t hidden;         // 1 = hidden
-    uint8_t system;         // 1 = system
-    uint8_t reserved0       = 0;
-    uint8_t directory;      // 0 = file 1 = directory
-    uint8_t archive;
-    uint8_t reserved1[10]   = {0};
-} __attribute__((packed));
-
-enum MetadataEntryFlags {
-    VALID       = 0x80,
-    CONTINUED   = 0x40,
-    OPTIONAL    = 0x20
-};
-
 enum MetadataEntryType {
     END_OF_DIRECTORY    = 0x00,
-    ALLOCATION_BITMAP   = 0x01 | VALID,                         // 0x81
-    UPCASE_TABLE        = 0x02 | VALID,                         // 0x82
-    VOLUME_LABEL        = 0x03 | VALID,                         // 0x83
-    FILE_DIR_ENTRY      = 0x05 | VALID,                         // 0x85
-    VOLUME_GUID         = 0x20 | VALID,                         // 0xA0
-    TEXFAT_PADDING      = 0x21 | VALID,                         // 0xA1
-    WINDOWS_CE_ACT      = 0x22 | VALID,                         // 0xA2
-    STREAM_EXTENSION    = 0x00 | VALID | CONTINUED,             // 0xC0
-    FILE_NAME           = 0x01 | VALID | CONTINUED,             // 0xC1
-    WINDOWS_CE_ACL      = 0x02 | VALID | CONTINUED,             // 0xC2
-    FILE_TAIL           = 0x00 | VALID | CONTINUED | OPTIONAL,  // 0xE0
+    ALLOCATION_BITMAP   = 0x01 | IN_USE,                         // 0x81
+    UPCASE_TABLE        = 0x02 | IN_USE,                         // 0x82
+    VOLUME_LABEL        = 0x03 | IN_USE,                         // 0x83
+    FILE_DIR_ENTRY      = 0x05 | IN_USE,                         // 0x85
+
+    VOLUME_GUID         = 0x20 | IN_USE,                         // 0xA0
+    TEXFAT_PADDING      = 0x21 | IN_USE,                         // 0xA1
+    WINDOWS_CE_ACT      = 0x22 | IN_USE,                         // 0xA2
+
+    STREAM_EXTENSION    = 0x00 | IN_USE | TYPE_CATEGORY,         // 0xC0
+    FILE_NAME           = 0x01 | IN_USE | TYPE_CATEGORY,         // 0xC1
+    WINDOWS_CE_ACL      = 0x02 | IN_USE | TYPE_CATEGORY,         // 0xC2
+
+    FILE_TAIL           = 0x00 | IN_USE | TYPE_CATEGORY | TYPE_IMPORTANCE,  // 0xE0
 };
 
-enum FileFlags {
-    ALLOC_POSSIBLE  = 1<<0, // if 0, first cluster and data length will be undefined in directory entry
-    CONTIGUOUS      = 1<<1
-};
-
-enum VolumeGuidFlags {
-    ALLOCATION_POSSIBLE = 1<<0, // must be 0
-    NO_FAT_CHAIN        = 1<<1  // must be 0
+enum GeneralDirectoryEntryFlags {
+    ALLOCATION_POSSIBLE  = 1<<0, // if 0, first cluster and data length will be undefined in directory entry. must be 0 in volume guid
+    NO_FAT_CHAIN         = 1<<1  // must be 0 in volume guid
 };
 
 struct raw_entry_t {
@@ -201,11 +190,11 @@ struct raw_entry_t {
 static_assert(sizeof(struct raw_entry_t) == 32);
 
 struct file_directory_entry_t {
-    uint8_t  type               = FILE_DIR_ENTRY;   // FILE_DIR_ENTRY = 0x85
-    uint8_t  continuations; // between 2 and 18
+    uint8_t  type               = FILE_DIR_ENTRY; // FILE_DIR_ENTRY = 0x85
+    uint8_t  continuations;     // between 2 and 18
     uint16_t checksum;
-    uint16_t attributes;
-    uint8_t  reserved0[2]       = {0};
+    uint16_t attribute_flags;
+    uint8_t  reserved1[2]       = {0};
     uint16_t created_time;
     uint16_t created_date;
     uint16_t modified_time;
@@ -215,7 +204,7 @@ struct file_directory_entry_t {
     uint8_t  created_time_cs;
     uint8_t  modified_time_cs;
     uint8_t  accessed_time_cs;
-    uint8_t  reserved1[9]       = {0};
+    uint8_t  reserved2[9]       = {0};
 
     bool isValid() {
         if (type != FILE_DIR_ENTRY) return false;
@@ -242,32 +231,32 @@ struct primary_directory_entry_t {
     uint8_t  type;              // one of fs_directory_entry_t
     uint8_t  secondary_count;   // 0 - 255, number of children in directory
     uint16_t set_checksum;      // checksum of directory entries in this set, excluding this field
-    uint16_t primary_flags;     // combination of fs_file_flags_t
-    uint8_t  reserved[14] = {0};
-    uint32_t first_cluster;     /* 0 = does not exist, otherwise, in range [2,ClusterCount+1] */
+    uint16_t flags;             // combination of GeneralDirectoryEntryFlags
+    uint8_t  custom_defined[14] = {0};
+    uint32_t first_cluster;     // 0 = does not exist, otherwise, in range [2,ClusterCount+1]
     uint64_t data_length;
 } __attribute__((packed));
 static_assert(sizeof(struct primary_directory_entry_t) == 32);
 
 struct secondary_directory_entry_t {
     uint8_t  type;              // one of fs_directory_entry_t
-    uint8_t  secondary_flags;   // combination of fs_file_flags_t
-    uint8_t  reserved[18]   = {0};
-    uint32_t first_cluster;     /* 0 = does not exist, otherwise, in range [2,ClusterCount+1] */
+    uint8_t  flags;             // combination of GeneralDirectoryEntryFlags
+    uint8_t  custom_defined[18] = {0};
+    uint32_t first_cluster;     // 0 = does not exist, otherwise, in range [2,ClusterCount+1]
     uint64_t data_length;
 } __attribute__((packed));
 static_assert(sizeof(struct secondary_directory_entry_t) == 32);
 
 struct stream_extension_entry_t {
     uint8_t type            = STREAM_EXTENSION;
-    uint8_t flags;          // Combination of fs_file_flags_t
-    uint8_t reserved0       = 0;
+    uint8_t flags;          // Combination of GeneralDirectoryEntryFlags
+    uint8_t reserved1       = 0;
     uint8_t name_length;
     uint16_t name_hash;
-    uint16_t reserved1      = 0;
+    uint16_t reserved2      = 0;
     uint64_t valid_size;
-    uint32_t reserved2      = 0;
-    uint32_t first_cluster;     /* 0 = does not exist, otherwise, in range [2,ClusterCount+1] */
+    uint32_t reserved3      = 0;
+    uint32_t first_cluster; // 0 = does not exist, otherwise, in range [2,ClusterCount+1]
     uint64_t size;
     bool isValid() {
         if (type != STREAM_EXTENSION) return false;
@@ -275,6 +264,14 @@ struct stream_extension_entry_t {
     }
 } __attribute__((packed));
 static_assert(sizeof(struct stream_extension_entry_t) == 32);
+
+struct vendor_extension_entry_t {
+    uint8_t type;
+    uint8_t flags;
+    uint8_t vendor_guid[16];
+    uint8_t vendor_defined[14];
+} __attribute__((packed));
+static_assert(sizeof(struct vendor_extension_entry_t) == 32);
 
 struct file_name_entry_t {
     static constexpr int FS_FILE_NAME_ENTRY_SIZE = 15;

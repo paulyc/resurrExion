@@ -188,7 +188,7 @@ public:
             return entityit->second;
         }
 
-        if (fde->attributes & exfat::DIRECTORY) {
+        if (fde->attribute_flags & exfat::DIRECTORY) {
             std::shared_ptr<DirectoryEntity> de =
                 std::make_shared<DirectoryEntity>(entity_start, continuations + 1, parent, utf8_name);
             _offset_to_entity_mapping[de->get_entity_start()] = de;
