@@ -26,7 +26,6 @@
 //
 
 #include <stdlib.h>
-#include <xlocale.h>
 #include <stdio.h>
 #include <stdint.h>
 #include <stddef.h>
@@ -67,14 +66,15 @@ namespace {
 
 std::string get_utf8_filename(exfat::file_directory_entry_t *fde, struct exfat::stream_extension_entry_t *sde)
 {
-    const int continuations = fde->continuations;
-    const int namelen = sde->name_length;
+    const size_t continuations = fde->continuations;
+    const size_t namelen = sde->name_length;
     std::basic_string<char16_t> u16s;
-    for (int c = 2; c <= continuations; ++c) {
+    for (size_t c = 2; c <= continuations; ++c) {
         exfat::file_name_entry_t *n = (exfat::file_name_entry_t *)(((uint8_t*)fde) + c*32);
         if (n->type == exfat::FILE_NAME) {
-            for (int i = 0; i < sizeof(n->name); ++i) {
-                if (u16s.length() == namelen) {
+            for (size_t i = 0; i < sizeof(n->name); ++i) {
+                // I suspect that exfat doesnt always set this length properly
+                if (n->name[i] == 0 || u16s.length() == namelen) {
                     return cvt.to_bytes(u16s);
                 } else {
                     u16s.push_back((char16_t)n->name[i]);
@@ -87,7 +87,7 @@ std::string get_utf8_filename(exfat::file_directory_entry_t *fde, struct exfat::
 
 class Entity;
 
-Entity * make_entity(std::streamoff offset, exfat::file_directory_entry_t *fde);
+Entity * make_entity(std::streamoff offset, exfat::file_directory_entry_t *fde, const char *suggested_name);
 
 class Entity{
 public:
@@ -103,8 +103,15 @@ public:
     virtual Entity * get_parent() const { return _parent; }
     virtual void set_parent(Entity *parent) { _parent = parent; }
 
-    virtual Entity * load_name() {
-        _name = get_utf8_filename(_fde, _streamext);
+    // defname is given if this fails
+    virtual Entity * load_name(const std::string &suggested_name) {
+        try {
+            _name = get_utf8_filename(_fde, _streamext);
+        } catch (const std::exception &ex) {
+            fprintf(stderr, "get_utf8_filename failed with [%s]: %s\n", typeid(ex).name(), ex.what());
+            fprintf(stderr, "using suggested name %s for entity %016lx\n", suggested_name.c_str(), get_offset());
+            _name = suggested_name;
+        }
         return this; //convenience
     }
 
@@ -119,11 +126,14 @@ public: // can't deal
 
 class File:public Entity{
 public:
-    File(std::streamoff offset, exfat::file_directory_entry_t *fde) : Entity(offset, fde) {}
+    File(std::streamoff offset, exfat::file_directory_entry_t *fde) : Entity(offset, fde) {
+        _contiguous = _streamext->flags & exfat::CONTIGUOUS;
+    }
     virtual ~File() {}
     bool is_contiguous() const {
-        return _streamext->flags & exfat::CONTIGUOUS;
+        return _contiguous;
     }
+    bool _contiguous;
 };
 
 class Directory:public Entity{
@@ -131,7 +141,6 @@ public:
     Directory(std::streamoff offset, exfat::file_directory_entry_t *fde) : Entity(offset, fde) {
     }
     virtual ~Directory() {}
-
     virtual void add_child(Entity *child) {
         child->set_parent(this);
         this->children.push_back(child);
@@ -141,11 +150,11 @@ private:
     std::vector<Entity*> children;
 };
 
-Entity * make_entity(std::streamoff offset, exfat::file_directory_entry_t *fde) {
+Entity * make_entity(std::streamoff offset, exfat::file_directory_entry_t *fde, const std::string &suggested_name) {
     if (fde->attributes & exfat::DIRECTORY) {
-        return (new Directory(offset, fde))->load_name();
+        return (new Directory(offset, fde))->load_name(suggested_name);
     } else {
-        return (new File(offset, fde))->load_name();
+        return (new File(offset, fde))->load_name(suggested_name);
     }
 }
 
@@ -184,8 +193,10 @@ public:
         }
 
         //const int mprot = write_changes ? PROT_READ | PROT_WRITE : PROT_READ;
-        //const int mflags = write_changes ? MAP_SHARED : MAP_PRIVATE | MAP_NOCACHE;
-        _mmap = (uint8_t*)mmap(0, DiskSize, PROT_READ, MAP_ANON|MAP_FILE|MAP_SHARED | MAP_NOCACHE, _fd, 0);
+        //const int mflags = write_changes ? MAP_SHARED : MAP_PRIVATE;
+        // Darwin doesn't like this with DiskSize == 3.6TB. Not sure if that's why,
+        // but only about 1G ends up actually getting mapped for my disk with ~270000 entities....
+        _mmap = (uint8_t*)mmap(0, DiskSize, PROT_READ, MAP_PRIVATE, _fd, 0);
         if (_mmap == (uint8_t*)MAP_FAILED) {
             std::cerr << "error opening mmap" << std::endl;
             throw std::system_error(std::error_code(errno, std::system_category()));
@@ -220,7 +231,7 @@ public:
         std::unordered_map<Entity*, Entity*> child_to_parent;
         std::unordered_map<Entity*, std::streamoff> entity_to_offset;
 
-        std::regex fde("FDE ([0-9a-fA-F]{16})(?: (.*))?");
+        std::regex fde("FDE ([0-9a-fA-F]{16}) (.*)");
         std::regex badsector("BAD_SECTOR ([0-9a-fA-F]{16})");
         std::ifstream logfile(filename);
         size_t count = 0;
@@ -235,11 +246,11 @@ public:
                 filename = sm[2];
                 try {
                     offset = std::stol(sm[1], nullptr, 16);
-                    Entity * ent = loadEntityOffset(offset);
+                    Entity * ent = loadEntityOffset(offset, filename);
                     _entities_to_offsets[ent] = offset;
                     _offsets_to_entities[offset] = ent;
                 } catch (std::exception &ex) {
-                    std::cerr << "Writing file entry to binlog, got exception: " << typeid(ex).name() << " with msg: " << ex.what() << std::endl;
+                    std::cerr << "Writing file entry to binlog, got exception: [" << typeid(ex).name() << "] with msg: " << ex.what() << std::endl;
                     std::cerr << "Invalid textlog FDE line, skipping: " << line << std::endl;
                 }
             } else if (std::regex_match(line, sm, badsector)) {
@@ -257,25 +268,43 @@ public:
         }
     }
 
-    void find_orphans() {
+    void log_results() {
         std::cerr << "find_orphans" << std::endl;
-        FILE *orphanlog = fopen("/Users/paulyc/Development/resurrExion/orphan.log", "w");
+        FILE *orphanlog = fopen("orphan.log", "w");
         for (auto it = _offsets_to_entities.begin(); it != _offsets_to_entities.end(); ++it) {
             const std::streamoff offset = it->first;
             const Entity *ent = it->second;
-            if (ent->get_parent() == nullptr) {
-                fprintf(orphanlog, "ORPHAN %016lld %s", offset, ent->get_name().c_str());
+            if (ent == nullptr) {
+                fprintf(orphanlog, "NOENT %016lx\n", offset);
+            } else {
+                const Entity *parent = ent->get_parent();
+                if (parent == nullptr) {
+                    fprintf(orphanlog, "ORPHAN %016ld %s\n", offset, ent->get_name().c_str());
+                } else {
+                    if (typeid(*ent) == typeid(File)) {
+                        const File *f = dynamic_cast<const File*>(ent);
+                        if (f->is_contiguous()) {
+                            fprintf(orphanlog, "FILE %016lx ", f->get_offset());
+                        } else {
+                            fprintf(orphanlog, "FRAGMENT %016lx ", f->get_offset());
+                        }
+                    } else {
+                        const Directory *d = dynamic_cast<const Directory*>(ent);
+                        fprintf(orphanlog, "DIRECTORY %016lx ", d->get_offset());
+                    }
+                    fprintf(orphanlog, " %016lx %s %s\n", parent->get_offset(), ent->get_name().c_str(), parent->get_name().c_str());
+                }
             }
         }
         fclose(orphanlog);
     }
 
-    Entity * loadEntityOffset(std::streamoff entity_offset) {
+    Entity * loadEntityOffset(std::streamoff entity_offset, const std::string &suggested_name) {
         //fprintf(stderr, "loadEntityOffset[%016lld]\n", entity_offset);
-        return loadEntity(entity_offset, _mmap + entity_offset);
+        return loadEntity(entity_offset, _mmap + entity_offset, suggested_name);
     }
 
-    Entity * loadEntity(std::streamoff offset, uint8_t *entity_start)
+    Entity * loadEntity(std::streamoff offset, uint8_t *entity_start, const std::string &suggested_name)
     {
         exfat::file_directory_entry_t *fde = (exfat::file_directory_entry_t*)(entity_start);
         exfat::stream_extension_entry_t *streamext = (exfat::stream_extension_entry_t*)(entity_start+32);
@@ -306,11 +335,11 @@ public:
         }
 
         if (chksum != fde->checksum) {
-            fprintf(stderr, "bad file entry checksum at offset %016llx\n", offset);
+            fprintf(stderr, "bad file entry checksum at offset %016lx\n", offset);
             return nullptr;
         }
 
-        return make_entity(offset, fde);
+        return make_entity(offset, fde, suggested_name);
     }
 
     void load_directory(std::streamoff offset, Directory *d) {
@@ -332,8 +361,7 @@ public:
 
         const uint8_t num_secondary_entries = dirent->primary_directory_entry.secondary_count;
         for (uint8_t secondary_entry = 0; secondary_entry < num_secondary_entries; ++secondary_entry) {
-            Entity *child = make_entity(offset, &dirent->file_directory_entry);
-            child->set_parent(d);
+            Entity *child = make_entity(offset, &dirent->file_directory_entry, std::string());
             d->add_child(child);
             dirent += child->_fde->continuations + 1;
             offset += sizeof(exfat::metadata_entry_u) * (child->_fde->continuations + 1);
@@ -351,9 +379,9 @@ public:
 
 int main(int argc, char *argv[]) {
     FilesystemStub stub;
-    stub.open("/dev/disk2");
-    stub.parseTextLog("/Users/paulyc/Development/resurrExion/recovery.log");
-    stub.find_orphans();
+    stub.open(argc > 1 ? argv[1] : "/dev/sdb");
+    stub.parseTextLog(argc > 2 ? argv[2] : "recovery.log");
+    stub.log_results();
     stub.close();
     return 0;
 }

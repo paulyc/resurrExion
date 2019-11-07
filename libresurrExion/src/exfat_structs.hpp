@@ -32,7 +32,6 @@
 #include <stdint.h>
 #include <string.h>
 #include <stdlib.h>
-#include <xlocale.h>
 
 #include <string>
 #include <algorithm>

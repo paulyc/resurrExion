@@ -35,6 +35,8 @@
 #include <log4cplus/initializer.h>
 #endif
 
+#include <stdarg.h>
+
 #include <memory>
 #include <sstream>
 

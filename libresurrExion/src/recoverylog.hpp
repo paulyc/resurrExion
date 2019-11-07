@@ -31,7 +31,6 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
-#include <xlocale.h>
 
 #include <sys/mman.h>
 #include <unistd.h>

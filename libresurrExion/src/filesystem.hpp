@@ -31,7 +31,6 @@
 #include <stdint.h>
 #include <stddef.h>
 #include <stdlib.h>
-#include <xlocale.h>
 #include <assert.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
