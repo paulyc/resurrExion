@@ -110,7 +110,7 @@ std::string get_utf8_filename(exfat::file_directory_entry_t *fde, struct exfat::
 
 class Entity;
 
-Entity * make_entity(std::streamoff offset, exfat::file_directory_entry_t *fde, const char *suggested_name);
+Entity * make_entity(std::streamoff offset, exfat::file_directory_entry_t *fde, const std::string &suggested_name);
 
 std::streamoff cluster_number_to_offset(uint32_t cluster) {
     // have to subtract 2 because the first cluster in the cluster heap has index 2 and
@@ -130,7 +130,7 @@ public:
                 _first_cluster = _streamext->first_cluster;
                 _data_length = _streamext->valid_size;
                 if (_first_cluster == 0) {
-                    _data_offset = offset + (_fde->continuations + 1)*sizeof(exfat::file_directory_entry_t);
+                    _data_offset = offset + (_fde->continuations + 2)*sizeof(exfat::file_directory_entry_t);
                 } else {
                     _data_offset = cluster_number_to_offset(_first_cluster);
                 }
@@ -171,6 +171,10 @@ public:
         return _data_offset;
     }
 
+    virtual uint8_t* get_data_ptr(uint8_t *mmap) const {
+        return _data_offset + mmap;
+    }
+
     virtual bool is_contiguous() const {
         return _contiguous;
     }
@@ -204,20 +208,20 @@ class Directory:public Entity{
 public:
     Directory(std::streamoff offset, exfat::file_directory_entry_t *fde) : Entity(offset, fde) {
        // _num_secondary_entries = fde->primary_directory_entry.secondary_count;
-        _pde = (struct exfat::primary_directory_entry_t*)fde;
+        uint8_t *mmap = (uint8_t*)fde - offset;
+        _pde = (struct exfat::primary_directory_entry_t*)fde+1;
         _num_secondary_entries = _pde->secondary_count;
-#if 0
-        think i have to lookup this offset out of the cluster heap
-        struct exfat::secondary_directory_entry_t *sde = nullptr; //= (struct exfat::secondary_directory_entry_t*)fde+1;
-        std::basic_string<char16_t> u16s;
-        for (size_t c = 2; c < _num_secondary_entries && u16s.length() <= namelen; ++c) {
-            if (n[c].type == exfat::FILE_NAME) {
-                for (size_t i = 0; i < exfat::file_name_entry_t::FS_FILE_NAME_ENTRY_SIZE && u16s.length() <= namelen; ++i) {
-                    u16s.push_back((char16_t)n[c].name[i]);
-                }
+        printf("dir %s has %d children?\n", this->get_name().c_str(), _num_secondary_entries);
+        struct exfat::secondary_directory_entry_t *sde = (struct exfat::secondary_directory_entry_t *)(fde+1+fde->continuations);
+        for (std::size_t i = 0; i < _num_secondary_entries; ++i) {
+#warning ugh do these have to be loaded recursively at that cluster offset for every file???? idk
+            //_child_entries.push_back(sde[i]); // [i], sde+i, sizeof(struct exfat::secondary_directory_entry_t));
+            if (sde->type == exfat::FILE_DIR_ENTRY) {
+                Entity * child = make_entity((uint8_t*)sde - mmap, (struct exfat::file_directory_entry_t*)sde, std::string());
+                printf("type %08x entry %016lx len %lu\n", sde->type, sde->first_cluster, sde->data_length);
             }
+            sde++;
         }
-#endif
     }
     virtual ~Directory() {}
     virtual uint8_t get_num_secondary_entries() const {
@@ -374,6 +378,14 @@ public:
         fclose(orphanlog);
     }
 
+    // confirmed working by checksumming a known file...
+    std::vector<uint8_t> read_file_contents(File *f) {
+        std::vector<uint8_t> contents(f->get_data_length());
+        uint8_t *data = f->get_data_offset() + _mmap;
+        memcpy(contents.data(), data, f->get_data_length());
+        return contents;
+    }
+
     Entity * loadEntityOffset(std::streamoff entity_offset, const std::string &suggested_name) {
         //fprintf(stderr, "loadEntityOffset[%016lld]\n", entity_offset);
         return loadEntity(entity_offset, _mmap + entity_offset, suggested_name);
@@ -418,7 +430,14 @@ public:
         _entities_to_offsets[ent] = offset;
         _offsets_to_entities[offset] = ent;
         if (typeid(*ent) == typeid(Directory)) {
-            //this->load_directory(dynamic_cast<Directory*>(ent));
+            Directory *d = dynamic_cast<Directory*>(ent);
+            //this->load_directory(d);
+        } else if (typeid(*ent) == typeid(File)) {
+            File *f = dynamic_cast<File*>(ent);
+            std::vector<uint8_t> content = this->read_file_contents(f);
+            FILE *ff = fopen("wt.dts", "wb");
+            fwrite(content.data(), 1, content.size(), ff);
+            fclose(ff);
         }
         return ent;
     }
