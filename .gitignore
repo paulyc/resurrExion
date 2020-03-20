@@ -44,3 +44,6 @@ resurrExion.xcodeproj/project.xcworkspace
 # QT Creator
 *.user*
 recovery.log
+orphan.log*
+*.log
+.vscode

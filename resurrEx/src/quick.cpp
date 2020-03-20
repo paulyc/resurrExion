@@ -207,25 +207,42 @@ public:
 class Directory:public Entity{
 public:
     Directory(std::streamoff offset, exfat::file_directory_entry_t *fde) : Entity(offset, fde) {
+#warning directory loading is currently a busted-ass hairball, kind of important too! fix ASAP
+        //i think this has
        // _num_secondary_entries = fde->primary_directory_entry.secondary_count;
         uint8_t *mmap = (uint8_t*)fde - offset;
-        _pde = (struct exfat::primary_directory_entry_t*)fde+1;
-        _num_secondary_entries = _pde->secondary_count;
-        printf("dir %s has %d children?\n", this->get_name().c_str(), _num_secondary_entries);
-        struct exfat::secondary_directory_entry_t *sde = (struct exfat::secondary_directory_entry_t *)(fde+1+fde->continuations);
-        for (std::size_t i = 0; i < _num_secondary_entries; ++i) {
-#warning ugh do these have to be loaded recursively at that cluster offset for every file???? idk
+        _pde = (struct exfat::primary_directory_entry_t*)(fde+1);
+
+        // i think this is an offset to the actual list of files in the directory
+        //_secondary_entries_offset = _pde->first_cluster * MAGIC + MAGIC
+        //
+        //printf("dir %s has %d children?\n", this->get_name().c_str(), _num_secondary_entries);
+        _sde = (struct exfat::secondary_directory_entry_t *)(fde+1);
+        printf(" sde first cluster %08x data length %016lx\n", _sde->first_cluster, _sde->data_length);
+        struct exfat::raw_entry_t *ent = (struct exfat::raw_entry_t*)(fde+2);
+        for (std::size_t i = 0; i < _pde->secondary_count - 2; ++i) {
+        // ugh do these have to be loaded recursively at that cluster offset for every file???? idk
             //_child_entries.push_back(sde[i]); // [i], sde+i, sizeof(struct exfat::secondary_directory_entry_t));
-            if (sde->type == exfat::FILE_DIR_ENTRY) {
+            /*if (sde->type == exfat::FILE_DIR_ENTRY) {
                 Entity * child = make_entity((uint8_t*)sde - mmap, (struct exfat::file_directory_entry_t*)sde, std::string());
-                printf("type %08x entry %016lx len %lu\n", sde->type, sde->first_cluster, sde->data_length);
+                printf("type %08x first_cluster %08x len %lu\n", sde->type, sde->first_cluster, sde->data_length);
+                this->add_child(child);
+            }*/
+            if (ent[i].type == exfat::FILE_NAME) {
+                struct exfat::file_name_entry_t *fname = (struct exfat::file_name_entry_t *)(ent+i);
+                //this->_name
+            } else {
+                printf(" unknown raw ent type %08x \n", ent[i].type);
             }
-            sde++;
         }
     }
     virtual ~Directory() {}
-    virtual uint8_t get_num_secondary_entries() const {
-        return _num_secondary_entries;
+    // is this the same as Entity::_first_cluster?
+    virtual uint32_t get_first_cluster() const {
+        return _sde->first_cluster;
+    }
+    virtual uint64_t get_data_length() const {
+        return _sde->data_length;
     }
     virtual void add_child(Entity *child) {
         child->set_parent(this);
@@ -234,7 +251,8 @@ public:
     virtual const std::vector<Entity*>& get_children() const { return _children; }
 private:
     struct exfat::primary_directory_entry_t *_pde;
-    uint8_t _num_secondary_entries;
+    struct exfat::secondary_directory_entry_t *_sde;
+    //uint8_t _num_secondary_entries;
     std::vector<struct exfat::secondary_directory_entry_t> _child_entries;
     std::vector<Entity*> _children;
 };
@@ -326,8 +344,9 @@ public:
                 try {
                     offset = std::stol(sm[1], nullptr, 16);
                     Entity * ent = loadEntityOffset(offset, filename);
-                    printf("%016lx %s\n", ent->get_offset(), ent->get_name().c_str());
-
+                    if (ent != nullptr) {
+                        printf("%016lx %s\n", ent->get_offset(), ent->get_name().c_str());
+                    }
                 } catch (std::exception &ex) {
                     std::cerr << "Writing file entry to binlog, got exception: [" << typeid(ex).name() << "] with msg: " << ex.what() << std::endl;
                     std::cerr << "Invalid textlog FDE line, skipping: " << line << std::endl;
@@ -347,9 +366,9 @@ public:
         }
     }
 
-    void log_results() {
+    void log_results(const char *orphanlogfilename) {
         std::cerr << "find_orphans" << std::endl;
-        FILE *orphanlog = fopen("orphan.log", "w");
+        FILE *orphanlog = fopen(orphanlogfilename, "w");
         for (auto it = _offsets_to_entities.begin(); it != _offsets_to_entities.end(); ++it) {
             const std::streamoff offset = it->first;
             const Entity *ent = it->second;
@@ -388,7 +407,12 @@ public:
 
     Entity * loadEntityOffset(std::streamoff entity_offset, const std::string &suggested_name) {
         //fprintf(stderr, "loadEntityOffset[%016lld]\n", entity_offset);
-        return loadEntity(entity_offset, _mmap + entity_offset, suggested_name);
+        auto loaded_entity = _offsets_to_entities.find(entity_offset);
+        if (loaded_entity != _offsets_to_entities.end()) {
+            return loaded_entity->second;
+        } else {
+            return loadEntity(entity_offset, _mmap + entity_offset, suggested_name);
+        }
     }
 
     Entity * loadEntity(std::streamoff offset, uint8_t *entity_start, const std::string &suggested_name)
@@ -431,24 +455,51 @@ public:
         _offsets_to_entities[offset] = ent;
         if (typeid(*ent) == typeid(Directory)) {
             Directory *d = dynamic_cast<Directory*>(ent);
-            //this->load_directory(d);
+            this->load_directory(d);
         } else if (typeid(*ent) == typeid(File)) {
             File *f = dynamic_cast<File*>(ent);
-            std::vector<uint8_t> content = this->read_file_contents(f);
-            FILE *ff = fopen("wt.dts", "wb");
-            fwrite(content.data(), 1, content.size(), ff);
-            fclose(ff);
+            if (this->should_write_file_data(f)) {
+                this->write_file_data(f, "wt.dts");
+            }
         }
         return ent;
     }
 
+    bool should_write_file_data(File *f) const {
+        return false;
+    }
+
+    void write_file_data(File *f, const std::string &filename) {
+        std::vector<uint8_t> content = this->read_file_contents(f);
+        FILE *ff = fopen(filename.c_str(), "wb");
+        fwrite(content.data(), 1, content.size(), ff);
+        fclose(ff);
+    }
+
     void load_directory(Directory *d) {
         printf("load_directory ");
-        const uint32_t start_cluster = d->_streamext->first_cluster;
-        const uint8_t num_entries = d->_fde->continuations + 1;
-        std::streamoff offset = d->get_data_offset();
-        const struct exfat::secondary_directory_entry_t *dirent = (struct exfat::secondary_directory_entry_t *)(_mmap + offset) + 2;
-        printf(" got %lu children\n", d->get_children().size());
+        //////unsure about this/////
+        //const uint32_t start_cluster = d->_streamext->first_cluster;
+        //const uint8_t num_entries = d->_fde->continuations + 1;
+        //std::streamoff dataoffset = d->get_data_offset();
+        ////////////////////////////
+        //printf(" got %lu children\n", d->get_children().size());
+        //for (Entity *e : d->get_children()) {
+        //    printf("   child %s\n", e->get_name().c_str());
+        //}
+        ////////////////////////////
+
+        //std::streamoff dataoffset = cluster_number_to_offset(d->get_first_cluster());
+        uint64_t datalen = d->get_data_length();
+        uint8_t *data = d->get_data_ptr(_mmap); // datalen + dataoffset;
+        uint8_t *enddata = data + datalen;
+        struct exfat::secondary_directory_entry_t *dirent = (struct exfat::secondary_directory_entry_t *)(data);
+        struct exfat::raw_entry_t *ent = (struct exfat::raw_entry_t*)(data);
+        struct exfat::raw_entry_t *end = (struct exfat::raw_entry_t*)(enddata);
+        //while (ent < end) {
+            //printf("  raw ent type %02x\n", ent->type);
+        //    ++ent;
+        //}
     }
 
     int      _fd;
@@ -462,9 +513,13 @@ public:
 
 int main(int argc, char *argv[]) {
     FilesystemStub stub;
+    if (argc != 4) {
+        fprintf(stderr, "usage: %s <device> <recovery_log> <orphan_log>", argv[0]);
+        return -1;
+    }
     stub.open(argc > 1 ? argv[1] : "/dev/sdb");
     stub.parseTextLog(argc > 2 ? argv[2] : "recovery.log");
-    stub.log_results();
+    stub.log_results(argc > 3 ? argv[3] : "orphan.log");
     stub.close();
     return 0;
 }
