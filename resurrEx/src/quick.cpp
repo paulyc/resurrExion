@@ -183,6 +183,10 @@ public:
         return _alloc_possible;
     }
 
+    virtual uint8_t get_num_continuations() const {
+        return _fde->continuations;
+    }
+
 public:
     std::string _name;
     std::streamoff _offset;
@@ -207,34 +211,33 @@ public:
 class Directory:public Entity{
 public:
     Directory(std::streamoff offset, exfat::file_directory_entry_t *fde) : Entity(offset, fde) {
-#warning directory loading is currently a busted-ass hairball, kind of important too! fix ASAP
         //i think this has
        // _num_secondary_entries = fde->primary_directory_entry.secondary_count;
         uint8_t *mmap = (uint8_t*)fde - offset;
-        _pde = (struct exfat::primary_directory_entry_t*)(fde+1);
+        _pde = (struct exfat::primary_directory_entry_t*)(fde);
 
         // i think this is an offset to the actual list of files in the directory
         //_secondary_entries_offset = _pde->first_cluster * MAGIC + MAGIC
         //
         //printf("dir %s has %d children?\n", this->get_name().c_str(), _num_secondary_entries);
         _sde = (struct exfat::secondary_directory_entry_t *)(fde+1);
-        printf(" sde first cluster %08x data length %016lx\n", _sde->first_cluster, _sde->data_length);
-        struct exfat::raw_entry_t *ent = (struct exfat::raw_entry_t*)(fde+2);
+        printf(" pde count %d sde first cluster %08x data length %016lx\n", _pde->secondary_count, _sde->first_cluster, _sde->data_length);
+        /*struct exfat::raw_entry_t *ent = (struct exfat::raw_entry_t*)(fde+2);
         for (std::size_t i = 0; i < _pde->secondary_count - 2; ++i) {
-        // ugh do these have to be loaded recursively at that cluster offset for every file???? idk
+        // these appear to all be in the cluster referred to by first_cluster
             //_child_entries.push_back(sde[i]); // [i], sde+i, sizeof(struct exfat::secondary_directory_entry_t));
-            /*if (sde->type == exfat::FILE_DIR_ENTRY) {
+            if (sde->type == exfat::FILE_DIR_ENTRY) {
                 Entity * child = make_entity((uint8_t*)sde - mmap, (struct exfat::file_directory_entry_t*)sde, std::string());
                 printf("type %08x first_cluster %08x len %lu\n", sde->type, sde->first_cluster, sde->data_length);
                 this->add_child(child);
-            }*/
+            }
             if (ent[i].type == exfat::FILE_NAME) {
                 struct exfat::file_name_entry_t *fname = (struct exfat::file_name_entry_t *)(ent+i);
                 //this->_name
             } else {
                 printf(" unknown raw ent type %08x \n", ent[i].type);
             }
-        }
+        }*/
     }
     virtual ~Directory() {}
     // is this the same as Entity::_first_cluster?
@@ -345,7 +348,7 @@ public:
                     offset = std::stol(sm[1], nullptr, 16);
                     Entity * ent = loadEntityOffset(offset, filename);
                     if (ent != nullptr) {
-                        printf("%016lx %s\n", ent->get_offset(), ent->get_name().c_str());
+                        //printf("%016lx %s\n", ent->get_offset(), ent->get_name().c_str());
                     }
                 } catch (std::exception &ex) {
                     std::cerr << "Writing file entry to binlog, got exception: [" << typeid(ex).name() << "] with msg: " << ex.what() << std::endl;
@@ -489,17 +492,47 @@ public:
         //}
         ////////////////////////////
 
-        //std::streamoff dataoffset = cluster_number_to_offset(d->get_first_cluster());
+
+        //
+        //uint8_t *data = d->get_data_ptr(_mmap); // datalen + dataoffset;
+        uint32_t first_cluster = d->get_first_cluster();
+        if (first_cluster == 0) {
+            printf("  first cluster is zero! cant handle, return\n");
+            return;
+        }
+        std::streamoff dataoffset = cluster_number_to_offset(first_cluster);
         uint64_t datalen = d->get_data_length();
-        uint8_t *data = d->get_data_ptr(_mmap); // datalen + dataoffset;
+        uint8_t *data = _mmap + dataoffset;
         uint8_t *enddata = data + datalen;
         struct exfat::secondary_directory_entry_t *dirent = (struct exfat::secondary_directory_entry_t *)(data);
         struct exfat::raw_entry_t *ent = (struct exfat::raw_entry_t*)(data);
         struct exfat::raw_entry_t *end = (struct exfat::raw_entry_t*)(enddata);
-        //while (ent < end) {
-            //printf("  raw ent type %02x\n", ent->type);
-        //    ++ent;
-        //}
+        while (ent < end) {
+            if (ent->type == exfat::FILE_DIR_ENTRY) {
+                Entity *e = this->loadEntityOffset(reinterpret_cast<uint8_t*>(ent) - _mmap, "noname");
+                if (e != nullptr) {
+                    d->add_child(e);
+                    printf("  child %s\n", e->get_name().c_str());
+                    ent += e->get_num_continuations();
+                }
+            } else if (ent->type == 0) {
+                printf("  end directory listing\n");
+                break;
+            } else {
+                switch (ent->type) {
+                case exfat::STREAM_EXTENSION:
+                case exfat::FILE_NAME:
+                case exfat::FILE_DIR_DELETED:
+                case exfat::STREAM_EXT_DELETED:
+                case exfat::FILE_NAME_DELETED:
+                    break;
+                default:
+                    printf("  unknown raw ent type %02x\n", ent->type);
+                    break;
+                }
+            }
+            ++ent;
+        }
     }
 
     int      _fd;
@@ -513,8 +546,11 @@ public:
 
 int main(int argc, char *argv[]) {
     FilesystemStub stub;
-    if (argc != 4) {
-        fprintf(stderr, "usage: %s <device> <recovery_log> <orphan_log>", argv[0]);
+    if (argc == 1) {
+        fprintf(stderr, "forcing defaults\n");
+
+    } else if (argc != 4) {
+        fprintf(stderr, "usage: %s <device> <recovery_log> <orphan_log>\n\n", argv[0]);
         return -1;
     }
     stub.open(argc > 1 ? argv[1] : "/dev/sdb");

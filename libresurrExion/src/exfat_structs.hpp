@@ -167,6 +167,8 @@ enum MetadataEntryType {
     VOLUME_LABEL        = 0x03 | IN_USE,                         // 0x83
     FILE_DIR_ENTRY      = 0x05 | IN_USE,                         // 0x85
 
+    FILE_DIR_DELETED    = 0x05,                                  // 0x05
+
     VOLUME_GUID         = 0x20 | IN_USE,                         // 0xA0
     TEXFAT_PADDING      = 0x21 | IN_USE,                         // 0xA1
     WINDOWS_CE_ACT      = 0x22 | IN_USE,                         // 0xA2
@@ -174,6 +176,9 @@ enum MetadataEntryType {
     STREAM_EXTENSION    = 0x00 | IN_USE | TYPE_CATEGORY,         // 0xC0
     FILE_NAME           = 0x01 | IN_USE | TYPE_CATEGORY,         // 0xC1
     WINDOWS_CE_ACL      = 0x02 | IN_USE | TYPE_CATEGORY,         // 0xC2
+
+    STREAM_EXT_DELETED  = 0x00 | TYPE_CATEGORY,                  // 0x40
+    FILE_NAME_DELETED   = 0x01 | TYPE_CATEGORY,                  // 0x41
 
     FILE_TAIL           = 0x00 | IN_USE | TYPE_CATEGORY | TYPE_IMPORTANCE,  // 0xE0
 };
