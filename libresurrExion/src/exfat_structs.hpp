@@ -315,7 +315,7 @@ struct volume_guid_entry_t {
 		uint16_t set_checksum = 0;
 		for (size_t i = 0; i < sizeof(struct volume_guid_entry_t); i++) {
 			if (i != 2 && i != 3) {
-				set_checksum = (set_checksum << 31) | (set_checksum >> 1) + data[i];
+				set_checksum = ((set_checksum << 15) | (set_checksum >> 1)) + data[i];
 			}
 		}
 		return set_checksum;
