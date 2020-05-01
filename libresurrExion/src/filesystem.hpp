@@ -2,9 +2,9 @@
 //  filesystem.hpp
 //  resurrExion
 //
-//  Created by Paul Ciarlo on 2/11/19.
+//  Created by Paul Ciarlo on 2/11/19
 //
-//  Copyright (C) 2019 Paul Ciarlo <paul.ciarlo@gmail.com>.
+//  Copyright (C) 2020 Paul Ciarlo <paul.ciarlo@gmail.com>
 //
 //  Permission is hereby granted, free of charge, to any person obtaining a copy
 //  of this software and associated documentation files (the "Software"), to deal
@@ -51,6 +51,7 @@
 
 #include "exception.hpp"
 #include "recoverylog.hpp"
+#include "types.hpp"
 
 #ifndef O_RSYNC
 #define O_RSYNC O_SYNC
@@ -62,7 +63,7 @@ namespace resurrExion {
 
 class BaseEntity;
 
-template <size_t SectorSize, size_t SectorsPerCluster, size_t NumSectors>
+template <size_t SectorSize, size_t SectorsPerCluster, sectorofs_t NumSectors>
 class ExFATFilesystem : public Loggable
 {
 public:
@@ -71,7 +72,7 @@ public:
         explicit restore_error(const std::string &msg) : std::runtime_error(msg) {}
     };
 
-    ExFATFilesystem(const char *devname, size_t devsize, size_t partition_first_sector, bool write_changes) :
+    ExFATFilesystem(const char *devname, byteofs_t devsize, byteofs_t partition_first_sector, bool write_changes) :
         _fd(-1),
         _mmap((uint8_t*)MAP_FAILED),
         _devsize(devsize),
@@ -111,7 +112,7 @@ public:
         }
     }
 
-    std::shared_ptr<BaseEntity> loadEntityOffset(std::streamoff entity_offset, std::shared_ptr<BaseEntity> parent) {
+    std::shared_ptr<BaseEntity> loadEntityOffset(byteofs_t entity_offset, std::shared_ptr<BaseEntity> parent) {
         return loadEntity(_mmap + entity_offset, parent);
     }
 
@@ -204,7 +205,7 @@ public:
 
     void loadDirectory(std::shared_ptr<DirectoryEntity> de)
     {
-        const uint32_t start_cluster = de->get_start_cluster();
+        const clusterofs_t start_cluster = de->get_start_cluster();
         exfat::metadata_entry_u *dirent;
         if (start_cluster == 0) {
             // directory children immediately follow
@@ -224,7 +225,7 @@ public:
 
     void init_metadata()
     {
-        constexpr size_t cluster_count = NumSectors / SectorsPerCluster;
+        constexpr clusterofs_t cluster_count = NumSectors / SectorsPerCluster;
         // pretty sure this is 0 because it's the first sector in the partition, not the whole disk
         // but i should verify
         _boot_region.vbr.partition_offset_sectors = 0;
@@ -303,7 +304,7 @@ public:
         typedef typename log_t::Entity_T entity_t;
         log_t reader;
 
-        reader.parseTextLog(textlogfilename, *this, [this](std::streamoff offset, entity_t ent, std::optional<std::exception> except) {
+        reader.parseTextLog(textlogfilename, *this, [this](byteofs_t offset, entity_t ent, std::optional<std::exception> except) {
             if (except.has_value()) {
                 const std::exception &ex = except.value();
                 logf(WARN, "entry_info had exception type %s with message %s\n", typeid(ex).name(), ex.what());
@@ -350,7 +351,7 @@ public:
         }
     }
 
-    void find_orphans(std::function<void(std::streamoff offset, std::shared_ptr<BaseEntity> ent)> fun) {
+    void find_orphans(std::function<void(byteofs_t offset, std::shared_ptr<BaseEntity> ent)> fun) {
         for (auto & [ entry_ptr, entity ] : _offset_to_entity_mapping) {
             if (entity->get_parent() == nullptr) {
                 fun(((std::streamoff)entry_ptr - (std::streamoff)_fs), entity);
@@ -358,7 +359,7 @@ public:
         }
     }
 
-    constexpr static size_t ClusterHeapDiskStartSector = 0x8C400; // relative to partition start
+    constexpr static byteofs_t ClusterHeapDiskStartSector = 0x8C400; // relative to partition start
 
     // TODO take out this trash
     void restore_all_files(const std::string &restore_dir_name, const std::string &textlogfilename)

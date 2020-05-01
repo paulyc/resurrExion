@@ -2,9 +2,9 @@
 //  exfat_structs.hpp - ExFAT filesysytem structures
 //  resurrExion
 //
-//  Created by Paul Ciarlo on 9 March 2019.
+//  Created by Paul Ciarlo on 9 March 2019
 //
-//  Copyright (C) 2019 Paul Ciarlo <paul.ciarlo@gmail.com>.
+//  Copyright (C) 2020 Paul Ciarlo <paul.ciarlo@gmail.com>
 //
 //  Permission is hereby granted, free of charge, to any person obtaining a copy
 //  of this software and associated documentation files (the "Software"), to deal
@@ -32,9 +32,9 @@
 #include <stdint.h>
 #include <string.h>
 #include <stdlib.h>
-
-#include <string>
 #include <algorithm>
+
+#include "types.hpp"
 
 namespace github {
 namespace paulyc {

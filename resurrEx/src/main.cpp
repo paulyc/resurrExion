@@ -2,9 +2,9 @@
 //  main.cpp
 //  resurrExion
 //
-//  Created by Paul Ciarlo on 2/11/19.
+//  Created by Paul Ciarlo on 2/11/19
 //
-//  Copyright (C) 2019 Paul Ciarlo <paul.ciarlo@gmail.com>.
+//  Copyright (C) 2020 Paul Ciarlo <paul.ciarlo@gmail.com>
 //
 //  Permission is hereby granted, free of charge, to any person obtaining a copy
 //  of this software and associated documentation files (the "Software"), to deal
@@ -27,6 +27,7 @@
 
 #include <iostream>
 #include <string>
+#include <list>
 
 #include "filesystem.hpp"
 #include "../config/fsconfig.hpp"
@@ -47,12 +48,74 @@ struct Options
     bool read_binary_log = false;
     size_t sector_size = 512;
     size_t sectors_per_cluster = 512;
-    size_t num_sectors;
-    size_t cluster_heap_offset;
+    sectorofs_t num_sectors;
+    byteofs_t cluster_heap_offset;
 };
 
+int help_method(const char *argv0) {
+    std::cerr << argv0 << " <method>" << std::endl;
+    return -1;
+}
+
+int analyze_method(const std::vector<std::string> &args) {
+    if (args.size() < 1) return -1;
+
+    return -2;
+}
+
+int init_method(const std::vector<std::string> &args) {
+    if (args.size() < 1) return -1;
+    try {
+        ExFATFilesystem<SectorSize, SectorsPerCluster, NumSectors>  fs(args[0].c_str(), DiskSize, PartitionStartSector, false);
+        fs.init_metadata();
+        return 0;
+    } catch (std::exception &ex) {
+        std::cerr << "Exception " << typeid(ex).name() << " caught: " << ex.what() << std::endl;
+        return -2;
+    }
+}
+
+//void log_sql(const char *sqlfilename);
+int orphans_method(const std::vector<std::string> &args);
+int fix_orphans_method(const std::vector<std::string> &args);
+
+//class parser
+enum method { default_, help, analyze, orphans, fix_orphans };
+
+#if 0
 int main(int argc, const char * argv[]) {
 #if 0
+    method m = default_;
+    std::vector<std::string> method_args;
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        if (arg == "analyze") {
+            m = analyze;
+        } else if (arg == "help") {
+            m = help;
+        } else if (arg == "orphans") {
+            m = orphans;
+        } else if (arg == "fix-orphans") {
+            m = fix_orphans;
+        } else {
+            method_args.push_back(arg);
+        }
+    }
+
+    switch (m) {
+        case analyze:
+            return analyze_method(method_args);
+        case default_:
+        case orphans:
+            return orphans_method(method_args);
+        case fix_orphans:
+            return fix_orphans_method(method_args);
+        case help:
+        default:
+            return help_method(argv[0]);
+    }
+
+
     namespace poptions = boost::program_options;
     poptions::options_description optdesc("Allowed options");
     optdesc.add_options()
@@ -65,20 +128,6 @@ int main(int argc, const char * argv[]) {
     clparser.positional(p);
     poptions::store(clparser.run(), varmap);
     poptions::notify(varmap);
-#endif
-#if 1
-    if (argc != 2) {
-        std::cerr << "usage: " << argv[0] << " <device>" << std::endl;
-        return -1;
-    }
-
-    try {
-        ExFATFilesystem<SectorSize, SectorsPerCluster, NumSectors>  fs(argv[1], DiskSize, PartitionStartSector, false);
-        fs.init_metadata();
-    } catch (std::exception &ex) {
-        std::cerr << "Exception " << typeid(ex).name() << " caught: " << ex.what() << std::endl;
-        return -2;
-    }
 #endif
 
 #if 0
@@ -126,20 +175,21 @@ int main(int argc, const char * argv[]) {
     }
 #endif
 
-#if 0
-    if (argc < 3 || argc > 3) {
-        std::cerr << "usage: " << argv[0] << " <device> <logfile>" << std::endl;
-        return -1;
-    }
+#if 1
+    //if (argc < 3 || argc > 3) {
+    //    std::cerr << "usage: " << argv[0] << " <device> <logfile>" << std::endl;
+    //    return -1;
+    //}
 
     try {
-        github::paulyc::resurrExion::RecoveryLogWriter writer;
-        writer.writeLog(argv[1], argv[2]);
+        github::paulyc::resurrExion::RecoveryLog<github::paulyc::resurrExion::ExFATFilesystem<SectorSize, 512, 7813560247>> writer;
+        writer.writeTextLog("/dev/sdb"/*argv[1]*/, "recovery.log"/*argv[2]*/);
     } catch (std::exception &e) {
         std::cerr << "Exception caught: " << e.what() << std::endl;
         return -2;
     }
 #endif
+
 #if 0
     if (argc < 4 || argc > 4) {
         std::cerr << "usage: " << argv[0] << " <device> <logfile> <outputdir>" << std::endl;
@@ -156,3 +206,4 @@ int main(int argc, const char * argv[]) {
 #endif
     return 0;
 }
+#endif

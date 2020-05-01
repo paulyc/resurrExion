@@ -2,9 +2,9 @@
 //  circbuf.hpp - Circular buffer
 //  resurrExion
 //
-//  Created by Paul Ciarlo on 24 Sep 2019.
+//  Created by Paul Ciarlo on 24 Sep 2019
 //
-//  Copyright (C) 2019 Paul Ciarlo <paul.ciarlo@gmail.com>.
+//  Copyright (C) 2020 Paul Ciarlo <paul.ciarlo@gmail.com>
 //
 //  Permission is hereby granted, free of charge, to any person obtaining a copy
 //  of this software and associated documentation files (the "Software"), to deal

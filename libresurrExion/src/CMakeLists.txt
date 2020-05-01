@@ -22,25 +22,19 @@
 # SOFTWARE.
 #
 
-set(LIB_HEADERS
-	../config/fsconfig.hpp
-	entity.hpp
-	exfat_structs.hpp
-	exception.hpp
-	filesystem.hpp
-	journal.hpp
-	logger.hpp
-	recoverylog.hpp
-	circbuf.hpp
+add_library(resurrExion SHARED
+    libmain.cpp
+    ../../config/fsconfig.hpp
+    entity.hpp
+    exfat_structs.hpp
+    exception.hpp
+    filesystem.hpp
+    journal.hpp
+    logger.hpp
+    recoverylog.hpp
+    circbuf.hpp
+    types.hpp
 )
-
-#set(LIB_COMPILE_SOURCES)
-
-add_library(
-	resurrExion
-	INTERFACE
-)
-#	${LIB_COMPILE_SOURCES}
 
 #set_source_files_properties(${LIB_HEADERS} PROPERTIES HEADER_FILE_ONLY TRUE)
 #target_include_directories(resurrExion PUBLIC ../config .)

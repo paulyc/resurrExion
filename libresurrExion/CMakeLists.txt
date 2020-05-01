@@ -23,4 +23,5 @@
 #
 
 add_subdirectory(src)
+#oops, no more libboost_unit_test? :(
 #add_subdirectory(test)

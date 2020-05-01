@@ -44,12 +44,14 @@
 
 #include <cstddef>
 
+#include "../libresurrExion/src/types.hpp"
+
 constexpr static size_t SectorSize = 512;
 constexpr static size_t SectorsPerCluster = 512;
-constexpr static size_t NumSectors = 7813560247;
-constexpr static size_t ClustersInFat = (NumSectors - 0x283D8) / 512;
-constexpr static size_t PartitionStartSector = 0x64028;
-constexpr static size_t ClusterHeapStartSector = 0x283D8; // relative to partition start
-constexpr static size_t DiskSize = (NumSectors + PartitionStartSector) * SectorSize;
+constexpr static sectorofs_t NumSectors = 7813560247;
+constexpr static clusterofs_t ClustersInFat = (NumSectors - 0x283D8) / 512;
+constexpr static sectorofs_t PartitionStartSector = 0x64028;
+constexpr static sectorofs_t ClusterHeapStartSector = 0x283D8; // relative to partition start
+constexpr static byteofs_t DiskSize = (NumSectors + PartitionStartSector) * SectorSize;
 
 #endif /* _github_paulyc_exfat_fsconfig_hpp_ */

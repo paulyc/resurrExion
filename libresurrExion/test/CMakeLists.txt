@@ -1,5 +1,5 @@
 #
-# ExFATRestore - recover damaged ExFAT filesystem
+# resurrExion - recover damaged ExFAT filesystem
 #
 # Copyright (C) 2019 Paul Ciarlo <paul.ciarlo@gmail.com>
 #
@@ -22,23 +22,14 @@
 # SOFTWARE.
 #
 
-set(TEST_HEADERS
-	filesystem.hpp
-	journal.hpp
-	logger.hpp
-)
-
-set(TEST_SOURCES
-	filesystem.cpp
-	journal.cpp
-	logger.cpp
-	main.cpp
-)
-
-add_executable(
-        testresurrExion
-	${TEST_HEADERS}
-	${TEST_SOURCES}
+add_executable(testresurrExion
+    main.cpp
+    filesystem.cpp
+    filesystem.hpp
+    journal.cpp
+    journal.hpp
+    logger.cpp
+    logger.hpp
 )
 
 target_include_directories(testresurrExion PUBLIC ${Boost_INCLUDE_DIRS})

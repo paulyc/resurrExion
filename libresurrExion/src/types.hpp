@@ -1,8 +1,8 @@
 //
-//  exception.hpp
+//  types.hpp
 //  resurrExion
 //
-//  Created by Paul Ciarlo on 2/12/19
+//  Created by Paul Ciarlo on 1 July 2020.
 //
 //  Copyright (C) 2020 Paul Ciarlo <paul.ciarlo@gmail.com>
 //
@@ -25,48 +25,26 @@
 //  SOFTWARE.
 //
 
-#ifndef _github_paulyc_exception_hpp_
-#define _github_paulyc_exception_hpp_
+#ifndef _github_paulyc_types_hpp_
+#define _github_paulyc_types_hpp_
 
+#include <cstdint>
+#include <functional>
 #include <string>
-#include <iostream>
-#include <exception>
-#include <system_error>
 
-namespace github {
-namespace paulyc {
+// no high bit
+typedef uint64_t byteofs_t;
+typedef int64_t  bytediff_t;
+static constexpr auto stobyteofs = [](const std::string &str, std::size_t *idx, int base) { return std::stoull(str, idx, base); };
 
-inline void assertBreakpoint(bool test, std::string msg)
-{
-    if (!test) {
-        std::cerr << "Breakpoint assertion failed: " << msg << std::endl;
-        asm("int $3");
-    }
-}
+// no high bit
+typedef uint64_t sectorofs_t;
+typedef int64_t  sectordiff_t;
+static constexpr auto stosectorofs = stobyteofs;
 
-} /* namespace paulyc */
-} /* namespace github */
+// no high bit
+typedef uint32_t clusterofs_t;
+typedef int32_t  clusterdiff_t;
+static constexpr auto stoclusterofs = stobyteofs;
 
-#define _github_paulyc_STRINGIFY(x) #x
-#define _github_paulyc_STRING(l) _github_paulyc_STRINGIFY(l)
-#define _github_paulyc_FILELINE __FILE__ ":" _github_paulyc_STRING(__LINE__)
-
-#ifdef _DEBUG
-
-#define ASSERT_BP(test, msg) github::paulyc::assertBreakpoint((test), (msg))
-
-#define ASSERT_THROW(assertion) \
-do { \
-if ((bool)(assertion) == false) { \
-throw std::runtime_error(\
-"[" _github_paulyc_FILELINE  "] Assertion failed: " _github_paulyc_STRINGIFY(assertion) \
-);}} while (0);
-
-#else /* _DEBUG */
-
-#define ASSERT_BP(test, msg)
-#define ASSERT_THROW(assertion)
-
-#endif /* _DEBUG */
-
-#endif /* _github_paulyc_exception_hpp_ */
+#endif /* _github_paulyc_types_hpp_ */

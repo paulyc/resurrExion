@@ -4,7 +4,7 @@
 //
 //  Created by Paul Ciarlo on 9 March 2019.
 //
-//  Copyright (C) 2019 Paul Ciarlo <paul.ciarlo@gmail.com>.
+//  Copyright (C) 2020 Paul Ciarlo <paul.ciarlo@gmail.com>
 //
 //  Permission is hereby granted, free of charge, to any person obtaining a copy
 //  of this software and associated documentation files (the "Software"), to deal
@@ -28,11 +28,10 @@
 #ifndef _github_paulyc_entity_hpp_
 #define _github_paulyc_entity_hpp_
 
-#include "exfat_structs.hpp"
-
 #include <list>
-#include <string>
 #include <memory>
+
+#include "exfat_structs.hpp"
 
 namespace github {
 namespace paulyc {
@@ -69,10 +68,10 @@ public:
     size_t get_file_info_size() const {
         return _num_entries * sizeof(exfat::metadata_entry_u);
     }
-    uint32_t get_start_cluster() const {
+    clusterofs_t get_start_cluster() const {
         return (_fs_entries + 1)->stream_extension_entry.first_cluster;
     }
-    uint64_t get_size() const {
+    byteofs_t get_size() const {
         return (_fs_entries + 1)->stream_extension_entry.size;
     }
     std::string get_name() const {
@@ -117,16 +116,25 @@ public:
         int num_entries,
         std::shared_ptr<BaseEntity> parent,
         const std::string &name) :
-        BaseEntity(entry_start, num_entries, parent, name)
+        BaseEntity(entry_start, num_entries, parent, name),
+        _dirty(false)
     {
     }
 
-    void add_child(std::shared_ptr<BaseEntity> child) { _children.push_back(child); }
+    void add_child(std::shared_ptr<BaseEntity> child, bool dirty=false) { _children.push_back(child); _dirty |= dirty; }
     const std::list<std::shared_ptr<BaseEntity>> &get_children() const { return _children; }
     virtual Type get_type() const{
         return Directory;
     }
+
+    void dirty_writeback() {
+         if (_dirty) {
+             _dirty = false;
+         }
+    }
+
 protected:
+    bool _dirty;
     std::list<std::shared_ptr<BaseEntity>> _children;
 };
 
