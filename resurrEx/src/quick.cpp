@@ -4,7 +4,7 @@
 //
 //  Created by Paul Ciarlo on 11/5/19.
 //
-//  Copyright (C) 2019 Paul Ciarlo <paul.ciarlo@gmail.com>.
+//  Copyright (C) 2020 Paul Ciarlo <paul.ciarlo@gmail.com>.
 //
 //  Permission is hereby granted, free of charge, to any person obtaining a copy
 //  of this software and associated documentation files (the "Software"), to deal
@@ -52,6 +52,7 @@
 #include <iostream>
 #include <functional>
 #include <regex>
+#include <list>
 
 #include "exfat_structs.hpp"
 
@@ -211,7 +212,7 @@ public:
 
 class Directory:public Entity{
 public:
-    Directory(std::streamoff offset, exfat::file_directory_entry_t *fde) : Entity(offset, fde) {
+    Directory(std::streamoff offset, exfat::file_directory_entry_t *fde) : Entity(offset, fde), _dirty(false) {
         //_sde = reinterpret_cast<struct exfat::secondary_directory_entry_t*>(fde+1);
         //printf("Dir %016lx continuation count %d sde first cluster %08x data length %016lx\n", offset, get_num_continuations(), _sde->first_cluster, _sde->data_length);
     }
@@ -223,17 +224,20 @@ public:
     virtual uint64_t get_data_length() const {
         return _sde->data_length;
     }*/
-    virtual void add_child(Entity *child) {
+    virtual void add_child(Entity *child, bool dirty=false) {
         child->set_parent(this);
         this->_children.push_back(child);
+        _dirty |= dirty;
     }
     virtual const std::vector<Entity*>& get_children() const { return _children; }
+    bool is_full() const { return _children.size() >= 254; } // ?
 private:
     //struct exfat::primary_directory_entry_t *_pde;
     //struct exfat::secondary_directory_entry_t *_sde;
     //uint8_t _num_secondary_entries;
     //std::vector<struct exfat::secondary_directory_entry_t> _child_entries;
     std::vector<Entity*> _children;
+    bool _dirty;
 };
 
 Entity::~Entity() {}
@@ -384,6 +388,40 @@ public:
         fclose(orphanlog);
     }
 
+    std::shared_ptr<Directory> allocate_directory() {
+        return std::make_shared<Directory>(0, nullptr);
+    }
+
+    std::list<std::shared_ptr<Directory>> adopt_orphans() {
+        std::shared_ptr<Directory> adoptive_directory;
+        std::list<std::shared_ptr<Directory>> new_directories;
+        for (auto it = _offsets_to_entities.begin(); it != _offsets_to_entities.end(); ++it) {
+            const std::streamoff offset = it->first;
+            Entity *ent = it->second;
+            if (ent != nullptr) {
+                const Entity *parent = ent->get_parent();
+                if (parent == nullptr) {
+                    if (!adoptive_directory) {
+                        adoptive_directory = allocate_directory();
+                    } else if (adoptive_directory->is_full()) {
+                        new_directories.push_back(adoptive_directory);
+                        adoptive_directory = allocate_directory();
+                    }
+                    ent->set_parent(adoptive_directory.get());
+                    adoptive_directory->add_child(ent, true);
+                }
+            }
+        }
+        if (adoptive_directory) {
+            new_directories.push_back(adoptive_directory);
+        }
+        return new_directories;
+    }
+
+    void dirty_writeback() {
+
+    }
+
     // confirmed working by checksumming a known file...
     std::vector<uint8_t> read_file_contents(File *f) {
         std::vector<uint8_t> contents(f->get_data_length());
@@ -510,17 +548,45 @@ public:
     std::unordered_map<std::streamoff, Entity*> _offsets_to_entities;
 };
 
-int main(int argc, char *argv[]) {
+int fix_orphans_method(const std::vector<std::string> &args) {
+    if (args.size() < 2) {
+        return -1;
+    }
     FilesystemStub stub;
+    stub.open(args[0]);
+    stub.parseTextLog(args[1]);
+    stub.adopt_orphans();
+    stub.dirty_writeback();
+    stub.close();
+    return 0;
+}
+
+int orphans_method(const std::vector<std::string> &args) {
+    if (args.size() < 3) {
+        return -1;
+    }
+    FilesystemStub stub;
+    stub.open(args[0]);
+    stub.parseTextLog(args[1]);
+    stub.log_results(args[2].c_str());
+    stub.close();
+    return 0;
+}
+
+#if 0
+int main(int argc, char *argv[]) {
     if (argc == 1) {
         fprintf(stderr, "forcing defaults\n");
+        return orphans_method({"/dev/sdb", "recovery.log", "orphan.log"});
+    } else if (argc == 2) {
+        return orphans_method({argv[1], "recovery.log", "orphan.log"});
+    } else if (argc == 3) {
+        return orphans_method({argv[1], argv[2], "orphan.log"});
+    } else if (argc == 4) {
+        return orphans_method({argv[1], argv[2], argv[3]});
     } else if (argc != 4) {
         fprintf(stderr, "usage: %s <device> <recovery_log> <orphan_log>\n\n", argv[0]);
         return -1;
     }
-    stub.open(argc > 1 ? argv[1] : "/dev/sdb");
-    stub.parseTextLog(argc > 2 ? argv[2] : "recovery.log");
-    stub.log_results(argc > 3 ? argv[3] : "orphan.log");
-    stub.close();
-    return 0;
 }
+#endif
