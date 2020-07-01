@@ -120,7 +120,7 @@ public:
         std::ofstream log(logfilename, std::ios::app);
 
         bool eof = false;
-        byteofs_t buffer_offset = 0x000002c3a7181480;
+        byteofs_t buffer_offset = 0x0000037dbf9ceb00;
                                      //0x0000000000000000;
                               // 0x0000000100000000 == 4 GB
         uint8_t buffer[0x100000], *bufp = buffer, *bufend = buffer + sizeof(buffer);

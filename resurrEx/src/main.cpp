@@ -82,7 +82,7 @@ int fix_orphans_method(const std::vector<std::string> &args);
 //class parser
 enum method { default_, help, analyze, orphans, fix_orphans };
 
-
+#if 0
 int main(int argc, const char * argv[]) {
 #if 0
     method m = default_;
@@ -206,3 +206,4 @@ int main(int argc, const char * argv[]) {
 #endif
     return 0;
 }
+#endif

@@ -75,8 +75,13 @@ constexpr static size_t DiskSize               = (NumSectors + PartitionStartSec
 constexpr static size_t ClusterHeapStartSectorRelWholeDisk = PartitionStartSector + ClusterHeapStartSector;
 constexpr static size_t ClusterHeapStartOffset = ClusterHeapStartSectorRelWholeDisk * SectorSize;
 
+class Entity;
+class File;
+class Directory;
+
 namespace {
     std::wstring_convert<std::codecvt_utf8_utf16<char16_t>, char16_t> cvt;
+    std::shared_ptr<Directory> RootDirectory;
 }
 
 bool is_valid_filename_char(char16_t ch) {
@@ -113,16 +118,6 @@ std::string get_utf8_filename(exfat::file_directory_entry_t *fde, struct exfat::
     return cvt.to_bytes(u16s);
 }
 
-class Entity;
-class File;
-class Directory;
-
-namespace {
-
-std::shared_ptr<Directory> RootDirectory;
-
-}
-
 Entity * make_entity(byteofs_t offset, exfat::file_directory_entry_t *fde, const std::string &suggested_name);
 
 byteofs_t cluster_number_to_offset(clusterofs_t cluster) {
@@ -133,6 +128,8 @@ byteofs_t cluster_number_to_offset(clusterofs_t cluster) {
 
 class Entity{
 public:
+    Entity() : _name("ROOT"), _offset(0), _fde(nullptr), _parent(this) {}
+
     Entity(byteofs_t offset, exfat::file_directory_entry_t *fde) :
         _offset(offset), _fde(fde), _parent(reinterpret_cast<Entity*>(RootDirectory.get())) {
             _streamext = reinterpret_cast<exfat::stream_extension_entry_t*>(fde+1);
@@ -200,6 +197,10 @@ public:
         return _fde->continuations;
     }
 
+    virtual size_t count_nodes() const = 0;
+
+    virtual void dump_sql(Entity *parent, FILE *sqllog, size_t &count) = 0;
+
 public:
     std::string _name;
     byteofs_t _offset;
@@ -220,10 +221,23 @@ public:
     File(byteofs_t offset, exfat::file_directory_entry_t *fde) :
         Entity(offset, fde) {}
     virtual ~File();
+    virtual size_t count_nodes() const {
+        return 1;
+    }
+    virtual void dump_sql(Entity *parent, FILE *sqllog, size_t &count) {
+        ++count;
+        fprintf(sqllog,
+            "INSERT INTO file(entry_offset, parent_directory_offset, name, data_offset, data_len, is_contiguous, is_copied_off) VALUES "
+            "                (0x%016lx, 0x%016lx, \"%s\", 0x%016lx, 0x%016lx, %d, 0);\n",
+            this->_offset, parent->get_offset(), this->get_name().c_str(), this->get_data_offset(), this->get_data_length(), this->is_contiguous() ? 1 : 0
+        );
+    }
 };
 
 class Directory:public Entity{
 public:
+    Directory() : Entity() {} //special case for root
+
     Directory(byteofs_t offset, exfat::file_directory_entry_t *fde) : Entity(offset, fde), _dirty(false) {
         //_sde = reinterpret_cast<struct exfat::secondary_directory_entry_t*>(fde+1);
         //printf("Dir %016lx continuation count %d sde first cluster %08x data length %016lx\n", offset, get_num_continuations(), _sde->first_cluster, _sde->data_length);
@@ -237,18 +251,43 @@ public:
         return _sde->data_length;
     }*/
     virtual void add_child(Entity *child, bool dirty=false) {
+        Directory *olddir = reinterpret_cast<Directory*>(child->get_parent());
+        olddir->remove_child(child);
         child->set_parent(this);
-        this->_children.push_back(child);
+        this->_children[child->get_offset()] = child;
         _dirty |= dirty;
     }
-    virtual const std::vector<Entity*>& get_children() const { return _children; }
+    void remove_child(Entity *child) {
+        delete this->_children[child->get_offset()];
+    }
     bool is_full() const { return _children.size() >= 254; } // ?
+    virtual size_t count_nodes() const {
+        size_t count = 1;
+        for (auto [ofs, ent] : _children) {
+            count += ent->count_nodes();
+        }
+        return count;
+    }
+    virtual void dump_sql(Entity *parent, FILE *sqllog, size_t &count) {
+        if (count++ % 50000 == 0) {
+            fprintf(sqllog, "COMMIT;\n"
+                            "START TRANSACTION;\n");
+        }
+        fprintf(sqllog,
+            "INSERT INTO directory(entry_offset, parent_directory_offset, name) VALUES "
+            "                (0x%016lx, 0x%016lx, \"%s\");\n",
+            this->get_offset(), parent->get_offset(), this->get_name().c_str()
+        );
+        for (auto [ofs, ent] : _children) {
+            ent->dump_sql(this, sqllog, count);
+        }
+    }
 private:
     //struct exfat::primary_directory_entry_t *_pde;
     //struct exfat::secondary_directory_entry_t *_sde;
     //uint8_t _num_secondary_entries;
     //std::vector<struct exfat::secondary_directory_entry_t> _child_entries;
-    std::vector<Entity*> _children;
+    std::map<byteofs_t, Entity*> _children;
     bool _dirty;
 };
 
@@ -258,9 +297,17 @@ Directory::~Directory() {}
 
 Entity * make_entity(byteofs_t offset, exfat::file_directory_entry_t *fde, const std::string &suggested_name) {
     if (fde->attribute_flags & exfat::DIRECTORY) {
-        return (new Directory(offset, fde))->load_name(suggested_name);
+        Directory *newdir = new Directory(offset, fde);
+        if (newdir->get_parent() == RootDirectory.get()) {
+            RootDirectory->add_child(newdir);
+        }
+        return newdir->load_name(suggested_name);
     } else {
-        return (new File(offset, fde))->load_name(suggested_name);
+        File *newfile = new File(offset, fde);
+        if (newfile->get_parent() == RootDirectory.get()) {
+            RootDirectory->add_child(newfile);
+        }
+        return newfile->load_name(suggested_name);
     }
 }
 
@@ -277,7 +324,6 @@ public:
         for (char16_t ch = 0; ch <= 0x001F; ++ch) {
             _invalid_file_name_characters.push_back(ch);
         }
-        RootDirectory = std::make_shared<Directory>(0, nullptr);
     }
 
     void open(std::string devpath) {
@@ -323,7 +369,14 @@ public:
         close();
     }
 
-    void parseTextLog(const std::string &filename)
+    bool checkIntegrity() const {
+        const size_t root_node_count = RootDirectory->count_nodes();
+        const size_t entity_node_count = this->_entities_to_offsets.size();
+        std::cerr << "checkIntegrity: root_node_count: " << root_node_count << " entity_node_count: " << std::endl;
+        return root_node_count == entity_node_count;
+    }
+
+    bool parseTextLog(const std::string &filename)
     {
         //std::unordered_map<Entity*, Entity*> child_to_parent;
         //std::unordered_map<Entity*, uint64_t> entity_to_offset;
@@ -336,6 +389,9 @@ public:
             std::smatch sm;
             if (count % 1000 == 0) {
                 printf("count: %zu\n", count);
+                if (count == 10000) {
+                    //break; //a test
+                }
             }
             if (std::regex_match(line, sm, fde)) {
                 byteofs_t offset;
@@ -343,7 +399,7 @@ public:
                 filename = sm[2];
                 try {
                     offset = stobyteofs(sm[1], nullptr, 16);
-                    Entity * ent = loadEntityOffset(offset, filename);
+                    Entity * ent = this->loadEntityOffset(offset, filename);
                     if (ent != nullptr) {
                         //printf("%016lx %s\n", ent->get_offset(), ent->get_name().c_str());
                     }
@@ -364,12 +420,23 @@ public:
                 std::cerr << "Unknown textlog line format: " << line << std::endl;
             }
         }
+        return true;
+        //return this->checkIntegrity();
     }
 
     void log_sql(const char *sqlfilename) {
         std::cerr << "log_sql" << std::endl;
         FILE *sqllog = fopen(sqlfilename, "w");
-        for (auto it = _offsets_to_entities.begin(); it != _offsets_to_entities.end(); ++it) {
+        fprintf(sqllog, "SET autocommit=0;\n"
+                        "SET unique_checks=0;\n"
+                        "SET foreign_key_checks=0;\n"
+                        "alter table directory disable keys;\n"
+                        "alter table file disable keys;\n");
+        fprintf(sqllog, "START TRANSACTION;\n");
+#if 1
+        RootDirectory->dump_sql(RootDirectory.get(), sqllog, 1);
+#else
+        for (auto it = _offsets_to_entities.begin(); it != _offsets_to_entities.end(); ++it, ++count) {
             const byteofs_t offset = it->first;
             const Entity *ent = it->second;
             if (ent == nullptr) {
@@ -381,15 +448,15 @@ public:
                     if (typeid(*ent) == typeid(File)) {
                         const File *f = dynamic_cast<const File*>(ent);
                         fprintf(sqllog, 
-                            "INSERT INTO file(entry_offset, parent_directory_id, name, data_offset, data_len, is_contiguous, is_copied_off) VALUES "
-                            "                (%016lx, NULL, '%s', %016lx, %016lx, %d, 0);\n",
+                            "INSERT INTO file(entry_offset, parent_directory_offset, name, data_offset, data_len, is_contiguous, is_copied_off) VALUES "
+                            "                (0x%016lx, NULL, \"%s\", 0x%016lx, 0x%016lx, %d, 0);\n",
                             offset, ent->get_name().c_str(), f->get_data_offset(), f->get_data_length(), f->is_contiguous() ? 1 : 0
                         );
                     } else {
                         //const Directory *d = dynamic_cast<const Directory*>(ent);
                         fprintf(sqllog, 
                             "INSERT INTO directory(entry_offset, parent_directory_offset, name) VALUES "
-                            "                (%016lx, NULL, '%s');\n",
+                            "                (0x%016lx, NULL, \"%s\");\n",
                             offset, ent->get_name().c_str()
                         );
                     }
@@ -398,19 +465,21 @@ public:
                         const File *f = dynamic_cast<const File*>(ent);
                         fprintf(sqllog, 
                             "INSERT INTO file(entry_offset, parent_directory_offset, name, data_offset, data_len, is_contiguous, is_copied_off) VALUES "
-                            "                (%016lx, %016lx, '%s', %016lx, %016lx, %d, 0);\n",
+                            "                (0x%016lx, 0x%016lx, \"%s\", 0x%016lx, 0x%016lx, %d, 0);\n",
                             offset, parent->get_offset(), ent->get_name().c_str(), f->get_data_offset(), f->get_data_length(), f->is_contiguous() ? 1 : 0
                         );
                     } else {
                         fprintf(sqllog, 
                             "INSERT INTO directory(entry_offset, parent_directory_offset, name) VALUES "
-                            "                (%016lx, %016lx, '%s');\n",
+                            "                (0x%016lx, 0x%016lx, \"%s\");\n",
                             offset, parent->get_offset(), ent->get_name().c_str()
                         );
                     }
                 }
             }
         }
+#endif
+        fprintf(sqllog, "COMMIT;\n");
         fclose(sqllog);
     }
 
@@ -458,6 +527,7 @@ public:
             Entity *ent = it->second;
             if (ent != nullptr) {
                 const Entity *parent = ent->get_parent();
+                assert(parent != nullptr);
                 if (parent == nullptr) {
                     if (!adoptive_directory) {
                         adoptive_directory = RootDirectory;
@@ -575,7 +645,7 @@ public:
                 Entity *e = this->loadEntityOffset(reinterpret_cast<uint8_t*>(ent) - _mmap, "noname");
                 if (e != nullptr) {
                     d->add_child(e);
-                    fprintf(stderr, "  child %s\n", e->get_name().c_str());
+                    //fprintf(stderr, "  child %s\n", e->get_name().c_str());
                     ent += e->get_num_continuations();
                 }
             } else if (ent->type == 0) {
@@ -606,14 +676,20 @@ public:
     std::unordered_map<byteofs_t, Entity*> _offsets_to_entities;
 };
 
-#if 0
+#if 1
 int main(int argc, char *argv[]) {
+    int ret = 0;
+    RootDirectory = std::make_shared<Directory>();
     FilesystemStub stub;
     stub.open("/dev/sdb");
-    stub.parseTextLog("recoverylog.log");
-    stub.log_sql_results("logfile.sql");
+    if (stub.parseTextLog("recovery.log")) {
+        stub.log_sql("logfile.sql");
+    } else {
+        std::cerr << "parseTextLog failed or tree failed integrity check" << std::endl;
+        ret = 1;
+    }
     stub.close();
-    return 0;
+    return ret;
 }
 #endif
 
