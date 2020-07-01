@@ -353,6 +353,55 @@ public:
         }
     }
 
+    void log_sql(const char *sqlfilename) {
+        std::cerr << "log_sql" << std::endl;
+        FILE *sqllog = fopen(sqlfilename, "w");
+        for (auto it = _offsets_to_entities.begin(); it != _offsets_to_entities.end(); ++it) {
+            const std::streamoff offset = it->first;
+            const Entity *ent = it->second;
+            if (ent == nullptr) {
+                //fprintf(orphanlog, "NOENT %016lx\n", offset);
+            } else {
+                const Entity *parent = ent->get_parent();
+                if (parent == nullptr) {
+                    if (typeid(*ent) == typeid(File)) {
+                        const File *f = dynamic_cast<const File*>(ent);
+                        fprintf(sqllog, 
+                            "INSERT INTO file(entry_offset, parent_directory_id, name, data_offset, data_len, is_contiguous, is_copied_off) VALUES "
+                            "                (%016llx, NULL, '%s', %016llx, %016llx, %d, 0);\n", 
+                            f->get_offset(), ent->get_name().c_str(), f->get_data_offset(), f->get_data_length(), f->is_contiguous() ? 1 : 0
+                        );
+                    } else {
+                        const Directory *d = dynamic_cast<const Directory*>(ent);
+                        fprintf(sqllog, 
+                            "INSERT INTO directory(name, entry_offset, parent_directory_id) VALUES "
+                            "                ('%s', %016llx, NULL);\n", 
+                            d->get_offset(), ent->get_name().c_str()
+                        );
+                    }
+                } else {
+                    if (typeid(*ent) == typeid(File)) {
+                        const File *f = dynamic_cast<const File*>(ent);
+                        fprintf(sqllog, 
+                            "INSERT INTO file(entry_offset, parent_directory_offset, name, data_offset, data_len, is_contiguous, is_copied_off) VALUES "
+                            "                (%016llx, %016llx, '%s', %016llx, %016llx, %d, 0);\n", 
+                            f->get_offset(), parent->get_offset(), ent->get_name().c_str(), f->get_data_offset(), f->get_data_length(), f->is_contiguous() ? 1 : 0
+                        );
+                        
+                    } else {
+                        const Directory *d = dynamic_cast<const Directory*>(ent);
+                        fprintf(sqllog, 
+                            "INSERT INTO directory(name, entry_offset, parent_directory_id) VALUES "
+                            "                ('%s', %016llx, %016llx);\n", 
+                            d->get_offset(), ent->get_name().c_str(), parent->get_offset()
+                        );
+                    }
+                }
+            }
+        }
+        fclose(sqllog);
+    }
+
     void log_results(const char *orphanlogfilename) {
         std::cerr << "find_orphans" << std::endl;
         FILE *orphanlog = fopen(orphanlogfilename, "w");
@@ -548,6 +597,16 @@ public:
     std::unordered_map<std::streamoff, Entity*> _offsets_to_entities;
 };
 
+int main(int argc, char *argv[]) {
+    FilesystemStub stub;
+    stub.open("/dev/sdb");
+    stub.parseTextLog("recoverylog.log");
+    stub.log_sql_results("logfile.sql");
+    stub.close();
+    return 0;
+}
+
+#if 0
 int fix_orphans_method(const std::vector<std::string> &args) {
     if (args.size() < 2) {
         return -1;
@@ -567,14 +626,18 @@ int orphans_method(const std::vector<std::string> &args) {
     }
     FilesystemStub stub;
     stub.open(args[0]);
-    stub.parseTextLog(args[1]);
-    stub.log_results(args[2].c_str());
+    RecoveryLog<> log;
+    //stub.parseTextLog(args[1]);
+    //stub.log_results(args[2].c_str());
+    stub.log_sql_results("logfile.sql");
     stub.close();
     return 0;
 }
 
-#if 0
+
 int main(int argc, char *argv[]) {
+    return orphans_method
+
     if (argc == 1) {
         fprintf(stderr, "forcing defaults\n");
         return orphans_method({"/dev/sdb", "recovery.log", "orphan.log"});

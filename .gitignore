@@ -47,3 +47,4 @@ recovery.log
 orphan.log*
 *.log
 .vscode
+*.code-workspace

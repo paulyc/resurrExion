@@ -21,6 +21,6 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 #
-
+project(libresurrExion)
 add_subdirectory(src)
 #add_subdirectory(test)

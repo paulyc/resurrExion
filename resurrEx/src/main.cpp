@@ -75,13 +75,16 @@ int init_method(const std::vector<std::string> &args) {
     }
 }
 
+//void log_sql(const char *sqlfilename);
 int orphans_method(const std::vector<std::string> &args);
 int fix_orphans_method(const std::vector<std::string> &args);
 
 //class parser
 enum method { default_, help, analyze, orphans, fix_orphans };
 
+
 int main(int argc, const char * argv[]) {
+#if 0
     method m = default_;
     std::vector<std::string> method_args;
     for (int i = 1; i < argc; ++i) {
@@ -112,7 +115,7 @@ int main(int argc, const char * argv[]) {
             return help_method(argv[0]);
     }
 
-#if 0
+
     namespace poptions = boost::program_options;
     poptions::options_description optdesc("Allowed options");
     optdesc.add_options()
@@ -172,20 +175,21 @@ int main(int argc, const char * argv[]) {
     }
 #endif
 
-#if 0
-    if (argc < 3 || argc > 3) {
-        std::cerr << "usage: " << argv[0] << " <device> <logfile>" << std::endl;
-        return -1;
-    }
+#if 1
+    //if (argc < 3 || argc > 3) {
+    //    std::cerr << "usage: " << argv[0] << " <device> <logfile>" << std::endl;
+    //    return -1;
+    //}
 
     try {
-        github::paulyc::resurrExion::RecoveryLogWriter writer;
-        writer.writeLog(argv[1], argv[2]);
+        github::paulyc::resurrExion::RecoveryLog<github::paulyc::resurrExion::ExFATFilesystem<SectorSize, 512, 7813560247>> writer;
+        writer.writeTextLog("/dev/sdb"/*argv[1]*/, "recovery.log"/*argv[2]*/);
     } catch (std::exception &e) {
         std::cerr << "Exception caught: " << e.what() << std::endl;
         return -2;
     }
 #endif
+
 #if 0
     if (argc < 4 || argc > 4) {
         std::cerr << "usage: " << argv[0] << " <device> <logfile> <outputdir>" << std::endl;
