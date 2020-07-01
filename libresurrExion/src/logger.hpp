@@ -2,9 +2,9 @@
 //  logger.hpp - Console/file/syslog logging interface
 //  resurrExion
 //
-//  Created by Paul Ciarlo on 5 March 2019.
+//  Created by Paul Ciarlo on 5 March 2019
 //
-//  Copyright (C) 2019 Paul Ciarlo <paul.ciarlo@gmail.com>.
+//  Copyright (C) 2020 Paul Ciarlo <paul.ciarlo@gmail.com>
 //
 //  Permission is hereby granted, free of charge, to any person obtaining a copy
 //  of this software and associated documentation files (the "Software"), to deal
@@ -35,10 +35,12 @@
 #include <log4cplus/initializer.h>
 #endif
 
-#include <stdarg.h>
-
+#include <cstdarg>
+#include <chrono>
+#include <iomanip>
 #include <memory>
 #include <sstream>
+#include <iostream>
 
 namespace github {
 namespace paulyc {

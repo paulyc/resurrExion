@@ -2,9 +2,9 @@
 //  filesystem.cpp - Filesystem tests
 //  resurrExion
 //
-//  Created by Paul Ciarlo on 5 March 2019.
+//  Created by Paul Ciarlo on 5 March 2019
 //
-//  Copyright (C) 2019 Paul Ciarlo <paul.ciarlo@gmail.com>.
+//  Copyright (C) 2020 Paul Ciarlo <paul.ciarlo@gmail.com>
 //
 //  Permission is hereby granted, free of charge, to any person obtaining a copy
 //  of this software and associated documentation files (the "Software"), to deal
@@ -28,7 +28,7 @@
 #define BOOST_TEST_DYN_LINK
 #include <boost/test/unit_test.hpp>
 
-#include "../config/fsconfig.hpp"
+#include "../../config/fsconfig.hpp"
 #include "../src/filesystem.hpp"
 
 using github::paulyc::Loggable;

@@ -32,11 +32,12 @@
 
 #include <deque>
 #include <memory>
-#include <string>
 #include <exception>
 #include <fstream>
 #include <functional>
 #include <algorithm>
+
+#include "types.hpp"
 
 namespace github {
 namespace paulyc {
@@ -51,7 +52,7 @@ public:
     }
     virtual ~TransactionJournal() {}
 
-    void add_write(size_t ofs_write, size_t ofs_read, size_t byte_count)
+    void add_write(byteofs_t ofs_write, byteofs_t ofs_read, size_t byte_count)
     {
         _changeset.push_back(std::make_unique<Diff>(_base_ptr + ofs_write, _base_ptr + ofs_read, byte_count));
     }

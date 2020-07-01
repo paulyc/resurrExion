@@ -2,9 +2,9 @@
 //  main.cpp
 //  resurrExion
 //
-//  Created by Paul Ciarlo on 2/11/19.
+//  Created by Paul Ciarlo on 2/11/19
 //
-//  Copyright (C) 2019 Paul Ciarlo <paul.ciarlo@gmail.com>.
+//  Copyright (C) 2020 Paul Ciarlo <paul.ciarlo@gmail.com>
 //
 //  Permission is hereby granted, free of charge, to any person obtaining a copy
 //  of this software and associated documentation files (the "Software"), to deal
@@ -48,8 +48,8 @@ struct Options
     bool read_binary_log = false;
     size_t sector_size = 512;
     size_t sectors_per_cluster = 512;
-    size_t num_sectors;
-    size_t cluster_heap_offset;
+    sectorofs_t num_sectors;
+    byteofs_t cluster_heap_offset;
 };
 
 int help_method(const char *argv0) {

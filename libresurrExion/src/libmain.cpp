@@ -1,8 +1,8 @@
 //
-//  exception.hpp
+//  libmain.cpp
 //  resurrExion
 //
-//  Created by Paul Ciarlo on 2/12/19
+//  Created by Paul Ciarlo on 1 July 2020
 //
 //  Copyright (C) 2020 Paul Ciarlo <paul.ciarlo@gmail.com>
 //
@@ -25,48 +25,8 @@
 //  SOFTWARE.
 //
 
-#ifndef _github_paulyc_exception_hpp_
-#define _github_paulyc_exception_hpp_
-
-#include <string>
-#include <iostream>
-#include <exception>
-#include <system_error>
-
-namespace github {
-namespace paulyc {
-
-inline void assertBreakpoint(bool test, std::string msg)
-{
-    if (!test) {
-        std::cerr << "Breakpoint assertion failed: " << msg << std::endl;
-        asm("int $3");
-    }
+__attribute__((constructor)) static void init() {
 }
 
-} /* namespace paulyc */
-} /* namespace github */
-
-#define _github_paulyc_STRINGIFY(x) #x
-#define _github_paulyc_STRING(l) _github_paulyc_STRINGIFY(l)
-#define _github_paulyc_FILELINE __FILE__ ":" _github_paulyc_STRING(__LINE__)
-
-#ifdef _DEBUG
-
-#define ASSERT_BP(test, msg) github::paulyc::assertBreakpoint((test), (msg))
-
-#define ASSERT_THROW(assertion) \
-do { \
-if ((bool)(assertion) == false) { \
-throw std::runtime_error(\
-"[" _github_paulyc_FILELINE  "] Assertion failed: " _github_paulyc_STRINGIFY(assertion) \
-);}} while (0);
-
-#else /* _DEBUG */
-
-#define ASSERT_BP(test, msg)
-#define ASSERT_THROW(assertion)
-
-#endif /* _DEBUG */
-
-#endif /* _github_paulyc_exception_hpp_ */
+__attribute__((destructor)) static void fini() {
+}

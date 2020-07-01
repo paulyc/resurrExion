@@ -2,9 +2,9 @@
 //  recoverylog.hpp
 //  resurrExion
 //
-//  Created by Paul Ciarlo on 2/12/19.
+//  Created by Paul Ciarlo on 2/12/19
 //
-//  Copyright (C) 2019 Paul Ciarlo <paul.ciarlo@gmail.com>.
+//  Copyright (C) 2019 Paul Ciarlo <paul.ciarlo@gmail.com>
 //
 //  Permission is hereby granted, free of charge, to any person obtaining a copy
 //  of this software and associated documentation files (the "Software"), to deal
@@ -47,6 +47,7 @@
 #include <iomanip>
 #include <regex>
 
+#include "types.hpp"
 #include "logger.hpp"
 #include "entity.hpp"
 
@@ -57,7 +58,7 @@ namespace resurrExion {
 constexpr int exfat_filename_maxlen = 256;
 constexpr int exfat_filename_maxlen_utf8 = exfat_filename_maxlen * 2;
 
-static constexpr int32_t BadSectorFlag = -1;
+static constexpr uint32_t BadSectorFlag = -1;
 
 template <typename Filesystem_T>
 class RecoveryLog : public Loggable
@@ -69,7 +70,7 @@ public:
     ~RecoveryLog() {}
 
     void parseTextLog(const std::string &filename, Filesystem_T &fs,
-                      std::function<void(std::streamoff, Entity_T, std::optional<std::exception>)> cb)
+                      std::function<void(byteofs_t, Entity_T, std::optional<std::exception>)> cb)
     {
         std::regex fde("FDE ([0-9a-fA-F]{16})(?: (.*))?");
         std::regex badsector("BAD_SECTOR ([0-9a-fA-F]{16})");
@@ -81,11 +82,11 @@ public:
                 printf("count: %zu\n", count);
             }
             if (std::regex_match(line, sm, fde)) {
-                std::streamoff offset;
+                byteofs_t offset;
                 std::string filename;
                 filename = sm[2];
                 try {
-                    offset = std::stol(sm[1], nullptr, 16);
+                    offset = stobyteofs(sm[1], nullptr, 16);
                     Entity_T ent = fs.loadEntityOffset(offset, nullptr);
                     cb(offset, ent, std::nullopt);
                 } catch (std::exception &ex) {
@@ -94,9 +95,9 @@ public:
                     cb(0, nullptr, std::make_optional(ex));
                 }
             } else if (std::regex_match(line, sm, badsector)) {
-                std::streamoff offset;
+                byteofs_t offset;
                 try {
-                    offset = std::stol(sm[1], nullptr, 16);
+                    offset = stobyteofs(sm[1], nullptr, 16);
                     cb(offset, nullptr, std::nullopt);
                 } catch (std::exception &ex) {
                     std::cerr << "Writing bad sector to binlog, got exception " << typeid(ex).name() << " with msg: " << ex.what() << std::endl;
@@ -119,7 +120,8 @@ public:
         std::ofstream log(logfilename, std::ios::app);
 
         bool eof = false;
-        std::streamoff buffer_offset = 0x0000000000000000;
+        byteofs_t buffer_offset = 0x000002c3a7181480;
+                                     //0x0000000000000000;
                               // 0x0000000100000000 == 4 GB
         uint8_t buffer[0x100000], *bufp = buffer, *bufend = buffer + sizeof(buffer);
         dev.seekg(buffer_offset);
@@ -215,15 +217,15 @@ public:
         cb(logfile);
     }
 
-    void writeBadSectorToBinLog(std::ofstream &logfile, size_t offset) {
-        logfile.write((const char *)&offset, sizeof(size_t));
-        logfile.write((const char *)&BadSectorFlag, sizeof(int32_t));
+    void writeBadSectorToBinLog(std::ofstream &logfile, byteofs_t offset) {
+        logfile.write((const char *)&offset, sizeof(byteofs_t));
+        logfile.write((const char *)&BadSectorFlag, sizeof(BadSectorFlag));
     }
 
-    void writeEntityToBinLog(std::ofstream &logfile, size_t offset, uint8_t *fde, Entity_T entity) {
-        const int entries_size_bytes = entity->get_file_info_size();
-        logfile.write((const char*)&offset, sizeof(size_t));
-        logfile.write((const char*)&entries_size_bytes, sizeof(int32_t));
+    void writeEntityToBinLog(std::ofstream &logfile, byteofs_t offset, uint8_t *fde, Entity_T entity) {
+        const size_t entries_size_bytes = entity->get_file_info_size();
+        logfile.write((const char*)&offset, sizeof(offset));
+        logfile.write((const char*)&entries_size_bytes, sizeof(entries_size_bytes));
         logfile.write((const char*)fde, entries_size_bytes);
     }
 

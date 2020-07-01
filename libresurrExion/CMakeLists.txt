@@ -21,6 +21,7 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 #
-project(libresurrExion)
+
 add_subdirectory(src)
+#oops, no more libboost_unit_test? :(
 #add_subdirectory(test)
