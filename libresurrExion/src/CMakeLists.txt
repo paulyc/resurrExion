@@ -34,8 +34,10 @@ add_library(resurrExion SHARED
     recoverylog.hpp
     circbuf.hpp
     types.hpp
+    database.cpp
+    database.hpp
 )
 
 #set_source_files_properties(${LIB_HEADERS} PROPERTIES HEADER_FILE_ONLY TRUE)
-#target_include_directories(resurrExion PUBLIC ../config .)
-#target_link_libraries(resurrExion)
+target_include_directories(resurrExion PUBLIC /usr/include/mysql)
+target_link_libraries(resurrExion -lmysqlpp)
