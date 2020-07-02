@@ -30,122 +30,179 @@
 
 #include <list>
 #include <memory>
+#include <iostream>
+#include <map>
 
-#include "exfat_structs.hpp"
+#include "types.hpp"
 
 namespace github {
 namespace paulyc {
 namespace resurrExion {
 
-class BaseEntity
-{
-public:
-    enum Type {
-        File,
-        Directory,
-        RootDirectory,
-        Unknown
-    };
+struct Entity;
+struct File;
+struct Directory;
 
-    BaseEntity() : _fs_entries(nullptr), _num_entries(0), _parent(nullptr), _name("invalid") {}
+Directory *GetRootDirectory();
 
-    BaseEntity(void *entry_start, uint8_t num_entries, std::shared_ptr<BaseEntity> parent, const std::string &name) :
-        _fs_entries((exfat::metadata_entry_u*)entry_start),
-        _num_entries(num_entries),
-        _parent(parent),
-        _name(name)
-    {
-    }
+struct Entity{
+    Entity() : _name("ROOT"), _offset(INVALID_BYTEOFS), _fde(nullptr), _parent(nullptr) {}
 
-    virtual ~BaseEntity() = default;
+    Entity(byteofs_t offset, exfat::file_directory_entry_t *fde) :
+        _offset(offset), _fde(fde), _parent(nullptr) {
+            _streamext = reinterpret_cast<exfat::stream_extension_entry_t*>(fde+1);
+            _nameent = reinterpret_cast<exfat::file_name_entry_t*>(fde+2);
+            _alloc_possible = _streamext->flags & exfat::ALLOCATION_POSSIBLE;
+            _contiguous = _streamext->flags & exfat::NO_FAT_CHAIN;
+            if (_alloc_possible) {
+                _first_cluster = _streamext->first_cluster;
+                _data_length = _streamext->size;
+                std::cout << "size: " << _streamext->size << " valid_size: " << _streamext->valid_size << std::endl;
+                if (_first_cluster == 0) {
+                    _data_offset = offset + static_cast<uint64_t>((_fde->continuations + 2)*sizeof(exfat::file_directory_entry_t));
+                } else {
+                    _data_offset = cluster_number_to_offset(_first_cluster);
+                }
+            } else {
+                // FirstCluster and DataLength are undefined
+                _first_cluster = INVALID_CLUSTEROFS;
+                _data_length = INVALID_BYTEOFS;
+            }
+        }
 
-    exfat::metadata_entry_u *get_entity_start() const {
-        return _fs_entries;
-    }
-    uint8_t get_num_entries() const {
-        return _num_entries;
-    }
-    size_t get_file_info_size() const {
-        return _num_entries * sizeof(exfat::metadata_entry_u);
-    }
-    clusterofs_t get_start_cluster() const {
-        return (_fs_entries + 1)->stream_extension_entry.first_cluster;
-    }
-    byteofs_t get_size() const {
-        return (_fs_entries + 1)->stream_extension_entry.size;
-    }
-    std::string get_name() const {
-        return _name;
-    }
-    std::shared_ptr<BaseEntity> get_parent() const {
-        return _parent;
-    }
-    void set_parent(std::shared_ptr<BaseEntity> parent) {
-        _parent = parent;
-    }
-    virtual Type get_type() const {
-        return Unknown;
+    virtual ~Entity() = default;
+
+    static Entity * make_entity(byteofs_t offset, exfat::file_directory_entry_t *fde, const std::string &suggested_name);
+
+    // defname is given if this fails
+    virtual Entity * load_name(const std::string &suggested_name) {
+        try {
+            _name = get_utf8_filename(_fde, _streamext);
+        } catch (const std::exception &ex) {
+            fprintf(stderr, "get_utf8_filename failed with [%s]: %s\n", typeid(ex).name(), ex.what());
+            fprintf(stderr, "using suggested name %s for entity %016lx\n", suggested_name.c_str(), this->_offset);
+            _name = suggested_name;
+        }
+        return this; //convenience
     }
 
-protected:
-    exfat::metadata_entry_u *_fs_entries;
-    uint8_t _num_entries;
-    std::shared_ptr<BaseEntity> _parent;
+
+    virtual byteofs_t get_parent_offset() const {
+        if (_parent != nullptr) {
+            return _parent->_offset;
+        } else {
+            return INVALID_BYTEOFS;
+        }
+    }
+
+    virtual uint8_t* get_data_ptr(uint8_t *mmap) const {
+        return _data_offset + mmap;
+    }
+
+    virtual uint8_t get_num_continuations() const {
+        return _fde->continuations;
+    }
+
+#ifdef NOBRAIN
+    virtual size_t count_nodes() const = 0;
+    virtual void dump_sql(Entity *parent, FILE *sqllog, size_t &count) = 0;
+    virtual std::string to_string() const { return "ENTITY"; }
+#endif
+
     std::string _name;
+    byteofs_t _offset;
+    exfat::file_directory_entry_t *_fde;
+    exfat::stream_extension_entry_t *_streamext;
+    exfat::file_name_entry_t *_nameent;
+    Entity *_parent;
+    byteofs_t _data_offset;
+    byteofs_t _data_length;
+    clusterofs_t _first_cluster;
+    bool _alloc_possible;
+    bool _contiguous;
+    uint8_t padding[2];
 };
 
-class FileEntity : public BaseEntity
-{
-public:
-    FileEntity(void *entry_start, uint8_t num_entries, std::shared_ptr<BaseEntity> parent, const std::string &name) :
-        BaseEntity(entry_start, num_entries, parent, name) {}
-
-    bool is_contiguous() const {
-        return (this->_fs_entries + 1)->stream_extension_entry.flags & exfat::NO_FAT_CHAIN;
+struct File:public Entity{
+    File(byteofs_t offset, exfat::file_directory_entry_t *fde) :
+        Entity(offset, fde) {}
+    virtual ~File() = default;
+#ifdef NOBRAIN
+    virtual void dump_sql(Entity *parent, FILE *sqllog, size_t &count) {
+        ++count;
+        fprintf(sqllog,
+            "INSERT INTO file(entry_offset, parent_directory_offset, name, data_offset, data_len, is_contiguous, is_copied_off) VALUES "
+            "                (0x%016lx, 0x%016lx, \"%s\", 0x%016lx, 0x%016lx, %d, 0);\n",
+            this->_offset, parent->get_offset(), this->get_name().c_str(), this->get_data_offset(), this->get_data_length(), this->is_contiguous() ? 1 : 0
+        );
     }
-    virtual Type get_type() const {
-        return File;
-    }
+#endif
 };
 
-class DirectoryEntity : public BaseEntity
-{
+struct Directory:public Entity{
 public:
-    DirectoryEntity(
-        void *entry_start,
-        int num_entries,
-        std::shared_ptr<BaseEntity> parent,
-        const std::string &name) :
-        BaseEntity(entry_start, num_entries, parent, name),
-        _dirty(false)
-    {
+    Directory() : Entity() {} //special case for root
+
+    Directory(byteofs_t offset, exfat::file_directory_entry_t *fde) : Entity(offset, fde), _dirty(false) {
+        //_sde = reinterpret_cast<struct exfat::secondary_directory_entry_t*>(fde+1);
+        //printf("Dir %016lx continuation count %d sde first cluster %08x data length %016lx\n", offset, get_num_continuations(), _sde->first_cluster, _sde->data_length);
+    }
+    virtual ~Directory();
+
+    virtual void add_child(Entity *child, bool dirty=false) {
+        if (child->_parent != nullptr) {
+            Directory *olddir = reinterpret_cast<Directory*>(child->_parent);
+            olddir->remove_child(child);
+        }
+        child->_parent = this;
+        this->_children[child->_offset] = child;
     }
 
-    void add_child(std::shared_ptr<BaseEntity> child, bool dirty=false) { _children.push_back(child); _dirty |= dirty; }
-    const std::list<std::shared_ptr<BaseEntity>> &get_children() const { return _children; }
-    virtual Type get_type() const{
-        return Directory;
+    void remove_child(Entity *child) {
+        delete this->_children[child->_offset];
+        child->_parent = nullptr;
     }
 
-    void dirty_writeback() {
-         if (_dirty) {
-             _dirty = false;
-         }
+    bool is_full() const { return _children.size() >= 254; } // ?
+
+    void dump_files(uint8_t *mmap, const std::string &dirname) {
+        for (auto [ofs, ent]: _children) {
+            if (typeid(*ent) == typeid(File)) {
+                File *f = reinterpret_cast<File*>(ent);
+                if (f->_contiguous) {
+                    std::string path = dirname + "/" + f->_name;
+                    std::cout << "writing " << path << std::endl;
+                    uint8_t *data = f->get_data_ptr(mmap);
+                    size_t sz = f->_data_length;
+                   // if (sz < 1000000) {
+                   //     sz = 1000000;
+                   // }
+                    FILE *output = fopen(path.c_str(), "wb");
+                    while (sz > 0) {
+                        size_t write = sz < 0x10000 ? sz : 0x10000;
+                        fwrite(data, write, 1, output);
+
+                        data += write;
+                        sz -= write;
+
+                    }
+                    fclose(output);
+                    std::cout << "wrote " << path << std::endl;
+                } else {
+                    std::cerr << "Non-contiguous file: " << f->_name << std::endl;
+                }
+            } else if (typeid(*ent) == typeid(Directory)) {
+                // recurse later
+            }
+        }
     }
 
-protected:
-    bool _dirty;
-    std::list<std::shared_ptr<BaseEntity>> _children;
-};
-
-class RootDirectoryEntity : public DirectoryEntity
-{
-public:
-    RootDirectoryEntity(void *entry_start) : DirectoryEntity(entry_start, 0, nullptr, "ROOT") {}
-
-    virtual Type get_type() const{
-        return RootDirectory;
-    }
+private:
+    //struct exfat::primary_directory_entry_t *_pde;
+    //struct exfat::secondary_directory_entry_t *_sde;
+    //uint8_t _num_secondary_entries;
+    //std::vector<struct exfat::secondary_directory_entry_t> _child_entries;
+    std::map<byteofs_t, Entity*> _children;
 };
 
 } /* namespace resurrExion */

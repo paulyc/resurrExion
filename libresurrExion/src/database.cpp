@@ -1,10 +1,10 @@
 //
-//  fsconfig.hpp - Parameters of a specific ExFAT filesystem
+//  database.cpp
 //  resurrExion
 //
-//  Created by Paul Ciarlo on 15 March 2019.
+//  Created by Paul Ciarlo on 2 July 2020
 //
-//  Copyright (C) 2019 Paul Ciarlo <paul.ciarlo@gmail.com>.
+//  Copyright (C) 2020 Paul Ciarlo <paul.ciarlo@gmail.com>
 //
 //  Permission is hereby granted, free of charge, to any person obtaining a copy
 //  of this software and associated documentation files (the "Software"), to deal
@@ -25,22 +25,4 @@
 //  SOFTWARE.
 //
 
-#ifndef _github_paulyc_exfat_fsconfig_hpp_
-#define _github_paulyc_exfat_fsconfig_hpp_
-
-/*
- static constexpr size_t sector_size_bytes = 512; // bytes 0x0200
- static constexpr size_t sectors_per_cluster = 512; // 0x0200
- static constexpr size_t cluster_size_bytes = sector_size_bytes * sectors_per_cluster; // 0x040000
- static constexpr size_t disk_size_bytes = 0x000003a352944000; // 40000000000; // 4TB
- static constexpr size_t cluster_heap_disk_start_sector = 0x8c400;
- static constexpr size_t cluster_heap_partition_start_sector = 0x283D8;
- static constexpr size_t partition_start_sector = 0x64028;
-
- static constexpr uint32_t start_offset_cluster = 0x00adb000;
- static constexpr size_t start_offset_bytes = start_offset_cluster * cluster_size_bytes;
- static constexpr size_t start_offset_sector = start_offset_bytes / sector_size_bytes;
- */
-
-
-#endif /* _github_paulyc_exfat_fsconfig_hpp_ */
+#include "database.hpp"

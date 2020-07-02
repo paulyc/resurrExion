@@ -25,15 +25,20 @@
 add_library(resurrExion SHARED
     libmain.cpp
     ../../config/fsconfig.hpp
+    database.hpp
+    database.cpp
     entity.hpp
+    entity.cpp
     exfat_structs.hpp
     exception.hpp
     filesystem.hpp
+    filesystem.cpp
     journal.hpp
     logger.hpp
     recoverylog.hpp
     circbuf.hpp
     types.hpp
+    types.cpp
 )
 
 #set_source_files_properties(${LIB_HEADERS} PROPERTIES HEADER_FILE_ONLY TRUE)

@@ -25,12 +25,14 @@
 //  SOFTWARE.
 //
 
+#ifdef FILE_IS_HELPFUL
+
 #include <iostream>
 #include <string>
 #include <list>
 
 #include "filesystem.hpp"
-#include "../config/fsconfig.hpp"
+#include "types.hpp"
 
 using github::paulyc::resurrExion::ExFATFilesystem;
 
@@ -82,8 +84,6 @@ int fix_orphans_method(const std::vector<std::string> &args);
 //class parser
 enum method { default_, help, analyze, orphans, fix_orphans };
 
-#if 0
-int main(int argc, const char * argv[]) {
 #if 0
     method m = default_;
     std::vector<std::string> method_args;
@@ -175,7 +175,7 @@ int main(int argc, const char * argv[]) {
     }
 #endif
 
-#if 1
+#if 1 && 0
     //if (argc < 3 || argc > 3) {
     //    std::cerr << "usage: " << argv[0] << " <device> <logfile>" << std::endl;
     //    return -1;
@@ -204,6 +204,5 @@ int main(int argc, const char * argv[]) {
         return -2;
     }
 #endif
-    return 0;
-}
+
 #endif

@@ -33,8 +33,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <algorithm>
-
-#include "types.hpp"
+#include <string>
 
 namespace github {
 namespace paulyc {
