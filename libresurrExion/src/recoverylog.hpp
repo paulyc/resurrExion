@@ -46,6 +46,7 @@
 #include <sstream>
 #include <iomanip>
 #include <regex>
+#include <memory>
 
 #include "types.hpp"
 #include "logger.hpp"
@@ -64,7 +65,7 @@ template <typename Filesystem_T>
 class RecoveryLog : public Loggable
 {
 public:
-    typedef std::shared_ptr<BaseEntity> Entity_T;
+    //typedef std::shared_ptr<BaseEntity> Entity_T;
 
     RecoveryLog() = default;
     ~RecoveryLog() {}
@@ -221,14 +222,14 @@ public:
         logfile.write((const char *)&offset, sizeof(byteofs_t));
         logfile.write((const char *)&BadSectorFlag, sizeof(BadSectorFlag));
     }
-
+#if 0
     void writeEntityToBinLog(std::ofstream &logfile, byteofs_t offset, uint8_t *fde, Entity_T entity) {
         const size_t entries_size_bytes = entity->get_file_info_size();
         logfile.write((const char*)&offset, sizeof(offset));
         logfile.write((const char*)&entries_size_bytes, sizeof(entries_size_bytes));
         logfile.write((const char*)fde, entries_size_bytes);
     }
-
+#endif
 protected:
     std::string _get_utf8_filename(uint8_t *fh, int namelen)
     {

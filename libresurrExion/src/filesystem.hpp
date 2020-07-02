@@ -52,6 +52,7 @@
 #include "exception.hpp"
 #include "recoverylog.hpp"
 #include "types.hpp"
+#include "logger.hpp"
 
 #ifndef O_RSYNC
 #define O_RSYNC O_SYNC
@@ -61,7 +62,7 @@ namespace github {
 namespace paulyc {
 namespace resurrExion {
 
-class BaseEntity;
+class Entity;
 
 template <size_t SectorSize, size_t SectorsPerCluster, sectorofs_t NumSectors>
 class ExFATFilesystem : public Loggable

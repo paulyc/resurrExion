@@ -39,6 +39,8 @@ add_library(resurrExion SHARED
     circbuf.hpp
     types.hpp
     types.cpp
+    strings.hpp
+    strings.cpp
 )
 
 #set_source_files_properties(${LIB_HEADERS} PROPERTIES HEADER_FILE_ONLY TRUE)

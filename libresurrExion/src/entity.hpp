@@ -34,6 +34,8 @@
 #include <map>
 
 #include "types.hpp"
+#include "exfat_structs.hpp"
+#include "strings.hpp"
 
 namespace github {
 namespace paulyc {
@@ -143,7 +145,7 @@ struct Directory:public Entity{
 public:
     Directory() : Entity() {} //special case for root
 
-    Directory(byteofs_t offset, exfat::file_directory_entry_t *fde) : Entity(offset, fde), _dirty(false) {
+    Directory(byteofs_t offset, exfat::file_directory_entry_t *fde) : Entity(offset, fde) {
         //_sde = reinterpret_cast<struct exfat::secondary_directory_entry_t*>(fde+1);
         //printf("Dir %016lx continuation count %d sde first cluster %08x data length %016lx\n", offset, get_num_continuations(), _sde->first_cluster, _sde->data_length);
     }
