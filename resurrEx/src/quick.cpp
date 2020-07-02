@@ -756,6 +756,11 @@ public:
 
 
 int main(int argc, char *argv[]) {
+    if (argc < 2) {
+        fprintf(stderr, "Youll need to enter a directory offset\n");
+	return 1;
+    }
+
     int ret = 0;
     RootDirectory = std::make_shared<Directory>();
     FilesystemStub stub;
@@ -768,10 +773,10 @@ int main(int argc, char *argv[]) {
         std::cerr << "parseTextLog failed or tree failed integrity check" << std::endl;
         ret = 1;
     }
+#else
+    Directory * d = reinterpret_cast<Directory*>(stub.loadEntityOffset(std::stoul(std::string(argv[1])), "Ethernaut"));
+    stub.dump_directory(d, ".");
 #endif
-    Directory * d = reinterpret_cast<Directory*>(stub.loadEntityOffset(2552679651936, "Ethernaut"));
-
-    stub.dump_directory(d, "Ayria");
     stub.close();
     return ret;
 }
