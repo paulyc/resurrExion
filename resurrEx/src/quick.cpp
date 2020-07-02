@@ -138,7 +138,8 @@ public:
             _contiguous = _streamext->flags & exfat::NO_FAT_CHAIN;
             if (_alloc_possible) {
                 _first_cluster = _streamext->first_cluster;
-                _data_length = _streamext->valid_size;
+                _data_length = _streamext->size;
+                std::cout << "size: " << _streamext->size << " valid_size: " << _streamext->valid_size << std::endl;
                 if (_first_cluster == 0) {
                     _data_offset = offset + static_cast<uint64_t>((_fde->continuations + 2)*sizeof(exfat::file_directory_entry_t));
                 } else {
@@ -293,6 +294,39 @@ public:
         }
     }
     virtual std::string to_string() const { return "DIRECTORY"; }
+
+    void dump_files(uint8_t *mmap, const std::string &dirname) {
+        for (auto [ofs, ent]: _children) {
+            if (typeid(*ent) == typeid(File)) {
+                File *f = reinterpret_cast<File*>(ent);
+                if (f->is_contiguous()) {
+                    std::string path = dirname + "/" + f->get_name();
+                    std::cout << "writing " << path << std::endl;
+                    uint8_t *data = f->get_data_ptr(mmap);
+                    size_t sz = f->get_data_length();
+                   // if (sz < 1000000) {
+                   //     sz = 1000000;
+                   // }
+                    FILE *output = fopen(path.c_str(), "wb");
+                    while (sz > 0) {
+                        size_t write = sz < 0x10000 ? sz : 0x10000;
+                        fwrite(data, write, 1, output);
+
+                        data += write;
+                        sz -= write;
+
+                    }
+                    fclose(output);
+                    std::cout << "wrote " << path << std::endl;
+                } else {
+                    std::cerr << "Non-contiguous file: " << f->get_name() << std::endl;
+                }
+            } else if (typeid(*ent) == typeid(Directory)) {
+                // recurse later
+            }
+        }
+    }
+
 private:
     //struct exfat::primary_directory_entry_t *_pde;
     //struct exfat::secondary_directory_entry_t *_sde;
@@ -577,6 +611,10 @@ public:
         return contents;
     }
 
+    void dump_directory(Directory *d, const std::string &dirname) {
+        d->dump_files(_mmap, dirname);
+    }
+
     Entity * loadEntityOffset(byteofs_t entity_offset, const std::string &suggested_name) {
         //fprintf(stderr, "loadEntityOffset[%016lld]\n", entity_offset);
         auto loaded_entity = _offsets_to_entities.find(entity_offset);
@@ -716,12 +754,13 @@ public:
     std::unordered_map<byteofs_t, Entity*> _offsets_to_entities;
 };
 
-#if 1
+
 int main(int argc, char *argv[]) {
     int ret = 0;
     RootDirectory = std::make_shared<Directory>();
     FilesystemStub stub;
     stub.open("/dev/sdb");
+#ifdef PARSE
     if (stub.parseTextLog("recovery.log")) {
         stub.adopt_orphans();
         stub.log_sql("logfile.sql");
@@ -729,10 +768,14 @@ int main(int argc, char *argv[]) {
         std::cerr << "parseTextLog failed or tree failed integrity check" << std::endl;
         ret = 1;
     }
+#endif
+    Directory * d = reinterpret_cast<Directory*>(stub.loadEntityOffset(2552679651936, "Ethernaut"));
+
+    stub.dump_directory(d, "Ayria");
     stub.close();
     return ret;
 }
-#endif
+
 
 #if 0
 int fix_orphans_method(const std::vector<std::string> &args) {
