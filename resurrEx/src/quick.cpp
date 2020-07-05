@@ -25,7 +25,7 @@
 //  SOFTWARE.
 //
 
-
+#include "database.hpp"
 #include "quick.hpp"
 
 int main(int argc, char *argv[]) {
@@ -46,9 +46,12 @@ int main(int argc, char *argv[]) {
         std::cerr << "parseTextLog failed or tree failed integrity check" << std::endl;
         ret = 1;
     }
-#else
+#elif DUMP
     Directory * d = reinterpret_cast<Directory*>(stub.loadEntityOffset(std::stoul(std::string(argv[1])), "Ethernaut"));
     stub.dump_directory(d, ".");
+#else
+    Database d("root", "root", "/run/mysqld/mysqld.sock", "resurrex");
+    d.rescue_music(stub, "/barracuda/rescuemusic");
 #endif
     stub.close();
     return ret;

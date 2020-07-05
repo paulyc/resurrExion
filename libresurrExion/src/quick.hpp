@@ -65,7 +65,7 @@ using namespace github::paulyc::resurrExion;
 
 typedef uint8_t my_cluster[512*512];
 
-#include "../config/fsconfig.hpp"
+#include "../../config/fsconfig.hpp"
 /*constexpr static size_t SectorSize             = 512;
 constexpr static size_t SectorsPerCluster      = 512;
 constexpr static size_t NumSectors             = 7813560247;
@@ -299,6 +299,7 @@ public:
     virtual std::string to_string() const { return "DIRECTORY"; }
 
     void dump_files(uint8_t *mmap, const std::string &dirname) {
+        mkdir(dirname.c_str(), 0777);
         for (auto [ofs, ent]: _children) {
             if (typeid(*ent) == typeid(File)) {
                 File *f = reinterpret_cast<File*>(ent);
@@ -307,9 +308,6 @@ public:
                     std::cout << "writing " << path << std::endl;
                     uint8_t *data = f->get_data_ptr(mmap);
                     size_t sz = f->get_data_length();
-                   // if (sz < 1000000) {
-                   //     sz = 1000000;
-                   // }
                     FILE *output = fopen(path.c_str(), "wb");
                     while (sz > 0) {
                         size_t write = sz < 0x10000 ? sz : 0x10000;
