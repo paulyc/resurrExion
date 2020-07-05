@@ -55,6 +55,8 @@ void Database::rescue_music(const std::string &musicdir) {
     mariadb::result_set_ref rs = _conn->query("select distinct(parent_directory_offset) from file where name like '%flac' or name like '%mp3' or name like '%wav' or name like '%m4a' or name like '%aiff' or name like '%aif'");
     while (rs->next()) {
         mariadb::u64 pdo = rs->get_unsigned64(0);
+        Directory * d = reinterpret_cast<Directory*>(stub.loadEntityOffset(pdo)), "temp"));
+        stub.dump_directory(d, ".");
     }
     rs = _conn->query("SELECT id, parent_directory_offset FROM file");
 }
