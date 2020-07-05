@@ -88,7 +88,7 @@ public:
     ~Database();
     //void migrate_to_sql_ids();
     void rescue_directories(const std::string &rescuedir);
-    void rescue_music(FilesystemStub &stub, const std::string &rescuedir);
+    void rescue_music(const std::string &dev, const std::string &dir);
     //void rescue_photos();
     //void rescue_x();
 //private:

@@ -58,6 +58,8 @@
 #include <regex>
 #include <list>
 
+#include <mariadb++/connection.hpp>
+
 #include "exfat_structs.hpp"
 
 using namespace github::paulyc;
@@ -298,13 +300,20 @@ public:
     }
     virtual std::string to_string() const { return "DIRECTORY"; }
 
+    void resolve_children(mariadb::connection_ref & conn) {
+        //mariadb::statement_ref fsr = conn->create_statement("select * from file where parent_directory_offset = ?");
+        //fsr->set_unsigned64(0, _offset);
+        //mariadb::result_set_ref rsf = fsr->query();
+    }
+
     void dump_files(uint8_t *mmap, const std::string &dirname) {
-        mkdir(dirname.c_str(), 0777);
+        std::string abs_dir = "/home/paulyc/elements/" + dirname;
+        mkdir(abs_dir.c_str(), 0777);
         for (auto [ofs, ent]: _children) {
             if (typeid(*ent) == typeid(File)) {
                 File *f = reinterpret_cast<File*>(ent);
                 if (f->is_contiguous()) {
-                    std::string path = dirname + "/" + f->get_name();
+                    std::string path = abs_dir + "/" + f->get_name();
                     std::cout << "writing " << path << std::endl;
                     uint8_t *data = f->get_data_ptr(mmap);
                     size_t sz = f->get_data_length();
@@ -667,6 +676,7 @@ public:
 
         } else if (typeid(*ent) == typeid(File)) {
             File *f = dynamic_cast<File*>(ent);
+
             if (this->should_write_file_data(f)) {
                 this->write_file_data(f, "wt.dts");
             }
@@ -703,7 +713,6 @@ public:
             if (ent->type == exfat::FILE_DIR_ENTRY) {
                 Entity *e = this->loadEntityOffset(reinterpret_cast<uint8_t*>(ent) - _mmap, "noname");
                 if (e != nullptr) {
-                    d->add_child(e);
                     if (typeid(*e) == typeid(Directory)) {
                         Directory *d = dynamic_cast<Directory*>(e);
                         fprintf(stderr,
@@ -719,7 +728,7 @@ public:
                                 f->get_offset(), f->get_parent_offset(), f->get_name().c_str(), f->get_data_offset(), f->get_data_length(), f->is_contiguous()
                         );
                     }
-
+                    d->add_child(e);
                     //fprintf(stderr, "  child %s\n", e->get_name().c_str());
                     ent += e->get_num_continuations();
                 }

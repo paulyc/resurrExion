@@ -51,14 +51,23 @@ void Database::rescue_directories(const std::string &rescuedir) {
     }
 }
 
-void Database::rescue_music(FilesystemStub &stub, const std::string &musicdir) {
+void Database::rescue_music(const std::string &dev, const std::string &dir) {
+    //dir = "/home/paulyc/elements";
+    FilesystemStub stub;
+    stub.open("/dev/sdb");
+    //stub.parseTextLog("recovery.log");
     mariadb::result_set_ref rs = _conn->query("select distinct(parent_directory_offset) from file where name like '%flac' or name like '%mp3' or name like '%wav' or name like '%m4a' or name like '%aiff' or name like '%aif'");
     while (rs->next()) {
         mariadb::u64 pdo = rs->get_unsigned64(0);
         Directory * d = reinterpret_cast<Directory*>(stub.loadEntityOffset(pdo, "temp"));
-        stub.dump_directory(d, d->get_name());
+        if (d == nullptr) {
+            continue;
+        }
+        //d->resolve_children(_conn);
+        std::string name = std::string(d->_name.c_str());
+        stub.dump_directory(d, name);
     }
-    rs = _conn->query("SELECT id, parent_directory_offset FROM file");
+    //rs = _conn->query("SELECT id, parent_directory_offset FROM file");
 }
 /*
 void Database::migrate_to_sql_ids() {

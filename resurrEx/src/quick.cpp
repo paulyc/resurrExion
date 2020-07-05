@@ -28,17 +28,27 @@
 #include "database.hpp"
 #include "quick.hpp"
 
+#if 1
 int main(int argc, char *argv[]) {
+    Database d("root", "root", "/run/mysqld/mysqld.sock", "resurrex");
+    d.rescue_music("/dev/sdb", "/home/paulyc/elements");
+    return 0;
+}
+#else
+
+int main(int argc, char *argv[]) {
+    FilesystemStub stub;
+    stub.open("/dev/sdb");
+#ifdef PARSE
     if (argc < 2) {
         fprintf(stderr, "Youll need to enter a directory offset\n");
 	return 1;
     }
 
-    int ret = 0;
+    int ret = 0;get_children()
     RootDirectory = std::make_shared<Directory>();
-    FilesystemStub stub;
-    stub.open("/dev/sdb");
-#ifdef PARSE
+
+
     if (stub.parseTextLog("recovery.log")) {
         stub.adopt_orphans();
         stub.log_sql("logfile.sql");
@@ -46,16 +56,14 @@ int main(int argc, char *argv[]) {
         std::cerr << "parseTextLog failed or tree failed integrity check" << std::endl;
         ret = 1;
     }
-#elif DUMP
+#else DUMP
     Directory * d = reinterpret_cast<Directory*>(stub.loadEntityOffset(std::stoul(std::string(argv[1])), "Ethernaut"));
     stub.dump_directory(d, ".");
-#else
-    Database d("root", "root", "/run/mysqld/mysqld.sock", "resurrex");
-    d.rescue_music(stub, "/barracuda/rescuemusic");
 #endif
     stub.close();
     return ret;
 }
+#endif
 
 
 #if 0
