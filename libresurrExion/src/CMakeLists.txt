@@ -36,6 +36,7 @@ add_library(resurrExion SHARED
     types.hpp
     database.cpp
     database.hpp
+    quick.hpp
 )
 
 #set_source_files_properties(${LIB_HEADERS} PROPERTIES HEADER_FILE_ONLY TRUE)
