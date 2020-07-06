@@ -306,7 +306,7 @@ public:
         //mariadb::result_set_ref rsf = fsr->query();
     }
 
-    void dump_files(uint8_t *mmap, const std::string &dirname) {
+    void dump_files(uint8_t *mmap, const std::string &dirname, std::function<void(File*)> yield) {
         std::string abs_dir = "/home/paulyc/elements/" + dirname;
         mkdir(abs_dir.c_str(), 0777);
         for (auto [ofs, ent]: _children) {
@@ -328,6 +328,7 @@ public:
                     }
                     fclose(output);
                     std::cout << "wrote " << path << std::endl;
+                    yield(f);
                 } else {
                     std::cerr << "Non-contiguous file: " << f->get_name() << std::endl;
                 }
@@ -621,8 +622,8 @@ public:
         return contents;
     }
 
-    void dump_directory(Directory *d, const std::string &dirname) {
-        d->dump_files(_mmap, dirname);
+    void dump_directory(Directory *d, const std::string &dirname, std::function<void(File*)> yield) {
+        d->dump_files(_mmap, dirname, yield);
     }
 
     Entity * loadEntityOffset(byteofs_t entity_offset, const std::string &suggested_name) {

@@ -55,9 +55,12 @@ void Database::rescue_music(const std::string &dev, const std::string &dir) {
     //dir = "/home/paulyc/elements";
     FilesystemStub stub;
     stub.open("/dev/sdb");
+    mariadb::statement_ref stmt = _conn->create_statement("update file set is_copied_off = 1 where file.entity_offset = ?");
+    std::function<void(File*)> onFileCopied = [&stmt](File *f){stmt->set_unsigned64(0, f->_offset); stmt->execute();};
     //stub.parseTextLog("recovery.log");
     mariadb::result_set_ref rs = _conn->query("select distinct(parent_directory_offset) from file where name like '%flac' or name like '%mp3' or name like '%wav' or name like '%m4a' or name like '%aiff' or name like '%aif'");
     while (rs->next()) {
+        mariadb::transaction_ref txref = _conn->create_transaction();
         mariadb::u64 pdo = rs->get_unsigned64(0);
         Directory * d = reinterpret_cast<Directory*>(stub.loadEntityOffset(pdo, "temp"));
         if (d == nullptr) {
@@ -65,9 +68,30 @@ void Database::rescue_music(const std::string &dev, const std::string &dir) {
         }
         //d->resolve_children(_conn);
         std::string name = std::string(d->_name.c_str());
-        stub.dump_directory(d, name);
+        stub.dump_directory(d, name, onFileCopied);
+        txref->commit();
     }
     //rs = _conn->query("SELECT id, parent_directory_offset FROM file");
+}
+void Database::rescue_photos() {
+    FilesystemStub stub;
+    stub.open("/dev/sdb");
+    mariadb::statement_ref stmt = _conn->create_statement("update file set is_copied_off = 1 where file.entity_offset = ?");
+    std::function<void(File*)> onFileCopied = [&stmt](File *f){stmt->set_unsigned64(0, f->_offset); stmt->execute();};
+    //stub.parseTextLog("recovery.log");
+    mariadb::result_set_ref rs = _conn->query("select distinct(parent_directory_offset) from file where name like '%jpg' or name like '%jpeg' or name like '%png' or name like '%MOV' or name like '%mov' or name like '%mp4' or name like '%avi' or name like '%wmv'");
+    while (rs->next()) {
+        mariadb::transaction_ref txref = _conn->create_transaction();
+        mariadb::u64 pdo = rs->get_unsigned64(0);
+        Directory * d = reinterpret_cast<Directory*>(stub.loadEntityOffset(pdo, "temp"));
+        if (d == nullptr) {
+            continue;
+        }
+        //d->resolve_children(_conn);
+        std::string name = std::string(d->_name.c_str());
+        stub.dump_directory(d, name, onFileCopied);
+        txref->commit();
+    }
 }
 /*
 void Database::migrate_to_sql_ids() {
@@ -79,9 +103,7 @@ void Database::migrate_to_sql_ids() {
 void Database::gather_music() {
     _conn->query("SELECT * FROM file WHERE name like '%flac' and parent_directory_offset = 0");
 }
-void Database::gather_photos() {
 
-}
 void Database::gather_x() {
 
 }
