@@ -26,7 +26,7 @@
 //
 
 #include "database.hpp"
-
+#include <unordered_set>
 
 // "root", "root", "resurrex", 0, "/run/mysqld/mysqld.sock"
 Database::Database(const std::string &user, const std::string &pass, const std::string &sock, const std::string &db) {
@@ -77,20 +77,41 @@ void Database::rescue_music() {
 void Database::rescue_photos() {
     FilesystemStub stub;
     stub.open("/dev/sdb");
-    mariadb::transaction_ref txref = _conn->create_transaction();
-    mariadb::statement_ref stmt = _conn->create_statement("update file set is_copied_off = 1 where file.entry_offset = ?");
-    std::function<void(File*)> onFileCopied = [&stmt](File *f){stmt->set_unsigned64(0, f->_offset); stmt->execute();};
-    //stub.parseTextLog("recovery.log");
-    mariadb::result_set_ref rs = _conn->query("select distinct(parent_directory_offset) from file where name like '%jpg' or name like '%jpeg' or name like '%png' or name like '%mov' or name like '%mp4' or name like '%avi' or name like '%wmv' or name like '%mkv'");
-    while (rs->next()) {
 
+    mariadb::statement_ref stmt = _conn->create_statement("update file set is_copied_off = 1 where file.entry_offset = ?");
+    mariadb::statement_ref dir_stmt = _conn->create_statement("select entry_offset, parent_directory_offset from directory where entry_offset = ?");
+    std::function<void(File*)> onFileCopied = [&stmt](File *f){stmt->set_unsigned64(0, f->_offset); stmt->execute();};
+    /*stub.parseTextLog("recovery.log");
+    //mariadb::result_set_ref rs = _conn->query("select distinct(parent_directory_offset) from file where name like '%jpg' or name like '%jpeg' or name like '%png' or name like '%mov' or name like '%mp4' or name like '%avi' or name like '%wmv' or name like '%mkv'");
+    //std::unordered_set<mariadb::u64> dirs;
+    //std::unordered_set<mariadb::u64> all_dirs;
+    while (rs->next()) {
         mariadb::u64 pdo = rs->get_unsigned64(0);
+        all_dirs.insert(pdo);
+    }
+
+    for (mariadb::u64 pdo : all_dirs) {
+        while (pdo != 0) {
+            dir_stmt->set_unsigned64(0, pdo);
+            mariadb::result_set_ref parent_rs = dir_stmt->query();
+            if (!parent_rs) break;
+            pdo = parent_rs->get_unsigned64(1);
+            if (pdo == 0) {
+                mariadb::u64 ofs = parent_rs->get_unsigned64(0);
+                dirs.insert(ofs);
+                break;
+            }
+        }
+    }*/
+
+    mariadb::transaction_ref txref = _conn->create_transaction();
+    mariadb::result_set_ref orphan_dirs = _conn->query("select entry_offset from directory where parent_directory_offset = 0 order by entry_offset asc");
+    while (orphan_dirs->next()) {
+        mariadb::u64 pdo = orphan_dirs->get_unsigned64(0);
         Directory * d = reinterpret_cast<Directory*>(stub.loadEntityOffset(pdo, "temp"));
         if (d == nullptr) {
-            continue;
+            std::cerr << "failed to load directory pdo = " << pdo << std::endl;
         }
-        //d->resolve_children(_conn);
-
         std::string name = std::string(d->_name.c_str()) + std::string("-") + std::to_string(d->_offset);
         stub.dump_directory(d, name, onFileCopied);
     }

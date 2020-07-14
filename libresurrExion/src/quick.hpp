@@ -306,9 +306,7 @@ public:
         //mariadb::result_set_ref rsf = fsr->query();
     }
 
-    void dump_files(uint8_t *mmap, const std::string &dirname, std::function<void(File*)> yield) {
-        std::string abs_dir = "/home/paulyc/elements/" + dirname;
-        mkdir(abs_dir.c_str(), 0777);
+    void dump_files(uint8_t *mmap, std::string abs_dir, std::function<void(File*)> yield) {
         for (auto [ofs, ent]: _children) {
             if (typeid(*ent) == typeid(File)) {
                 File *f = reinterpret_cast<File*>(ent);
@@ -327,13 +325,18 @@ public:
 
                     }
                     fclose(output);
-                    std::cout << "wrote " << path << std::endl;
+                    std::cout << "wrote file " << path << std::endl;
                     yield(f);
                 } else {
                     std::cerr << "Non-contiguous file: " << f->get_name() << std::endl;
                 }
             } else if (typeid(*ent) == typeid(Directory)) {
-                // recurse later
+                Directory *d = reinterpret_cast<Directory*>(ent);
+                std::cout << "writing dir " << d->_name << std::endl;
+                abs_dir = abs_dir + std::string("/") + std::string(d->_name.c_str());
+                mkdir(abs_dir.c_str(), 0777);
+                d->dump_files(mmap, abs_dir, yield);
+                std::cout << "done writing dir " << d->_name << std::endl;
             }
         }
     }
@@ -623,7 +626,9 @@ public:
     }
 
     void dump_directory(Directory *d, const std::string &dirname, std::function<void(File*)> yield) {
-        d->dump_files(_mmap, dirname, yield);
+        std::string abs_dir = "/home/paulyc/elements/" + dirname;
+        mkdir(abs_dir.c_str(), 0777);
+        d->dump_files(_mmap, abs_dir, yield);
     }
 
     Entity * loadEntityOffset(byteofs_t entity_offset, const std::string &suggested_name) {
