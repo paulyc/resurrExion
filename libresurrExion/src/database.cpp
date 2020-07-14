@@ -51,7 +51,7 @@ void Database::rescue_directories(const std::string &rescuedir) {
     }
 }
 
-void Database::rescue_music(const std::string &dev, const std::string &dir) {
+void Database::rescue_music() {
     //dir = "/home/paulyc/elements";
     FilesystemStub stub;
     stub.open("/dev/sdb");
@@ -73,25 +73,28 @@ void Database::rescue_music(const std::string &dev, const std::string &dir) {
     }
     //rs = _conn->query("SELECT id, parent_directory_offset FROM file");
 }
+
 void Database::rescue_photos() {
     FilesystemStub stub;
     stub.open("/dev/sdb");
-    mariadb::statement_ref stmt = _conn->create_statement("update file set is_copied_off = 1 where file.entity_offset = ?");
+    mariadb::transaction_ref txref = _conn->create_transaction();
+    mariadb::statement_ref stmt = _conn->create_statement("update file set is_copied_off = 1 where file.entry_offset = ?");
     std::function<void(File*)> onFileCopied = [&stmt](File *f){stmt->set_unsigned64(0, f->_offset); stmt->execute();};
     //stub.parseTextLog("recovery.log");
-    mariadb::result_set_ref rs = _conn->query("select distinct(parent_directory_offset) from file where name like '%jpg' or name like '%jpeg' or name like '%png' or name like '%MOV' or name like '%mov' or name like '%mp4' or name like '%avi' or name like '%wmv'");
+    mariadb::result_set_ref rs = _conn->query("select distinct(parent_directory_offset) from file where name like '%jpg' or name like '%jpeg' or name like '%png' or name like '%mov' or name like '%mp4' or name like '%avi' or name like '%wmv' or name like '%mkv'");
     while (rs->next()) {
-        mariadb::transaction_ref txref = _conn->create_transaction();
+
         mariadb::u64 pdo = rs->get_unsigned64(0);
         Directory * d = reinterpret_cast<Directory*>(stub.loadEntityOffset(pdo, "temp"));
         if (d == nullptr) {
             continue;
         }
         //d->resolve_children(_conn);
-        std::string name = std::string(d->_name.c_str());
+
+        std::string name = std::string(d->_name.c_str()) + std::string("-") + std::to_string(d->_offset);
         stub.dump_directory(d, name, onFileCopied);
-        txref->commit();
     }
+    txref->commit();
 }
 /*
 void Database::migrate_to_sql_ids() {
