@@ -87,7 +87,6 @@ public:
     Database(const std::string &user, const std::string &pass, const std::string &sock, const std::string &db);
     ~Database();
     //void migrate_to_sql_ids();
-    void rescue_directories(const std::string &rescuedir);
     void rescue_music();
     void rescue_photos();
     //void rescue_x();
