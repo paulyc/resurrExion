@@ -31,7 +31,7 @@
 #if 1
 int main(int argc, char *argv[]) {
     Database d("root", "root", "/run/mysqld/mysqld.sock", "resurrex");
-    d.rescue_photos();
+    d.rescue_orphan_files("/dev/sdb", "/barracuda/orphans");
     return 0;
 }
 #else

@@ -26,3 +26,22 @@
 //
 
 #include "quickentity.hpp"
+
+Entity * make_entity(byteofs_t offset, exfat::file_directory_entry_t *fde, const std::string &suggested_name) {
+    if (fde->attribute_flags & exfat::DIRECTORY) {
+        Directory *newdir = new Directory(offset, fde);
+        //if (newdir->get_parent() == RootDirectory.get()) {
+        //    RootDirectory->add_child(newdir);
+        //}
+        newdir->load_name(suggested_name);
+
+        return newdir;
+    } else {
+        File *newfile = new File(offset, fde);
+        //if (newfile->get_parent() == RootDirectory.get()) {
+        //    RootDirectory->add_child(newfile);
+        //}
+        newfile->load_name(suggested_name);
+        return newfile;
+    }
+}
