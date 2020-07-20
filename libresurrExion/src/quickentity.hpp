@@ -118,10 +118,6 @@ public:
         return _fde->continuations;
     }
 
-    virtual size_t count_nodes() const = 0;
-
-    virtual void dump_sql(Entity *parent, FILE *sqllog, size_t &count) = 0;
-
     virtual std::string to_string() const { return "ENTITY"; }
 
 public:
@@ -144,17 +140,6 @@ public:
     File(byteofs_t offset, exfat::file_directory_entry_t *fde) :
         Entity(offset, fde) {}
     virtual ~File() {}
-    virtual size_t count_nodes() const {
-        return 1;
-    }
-    virtual void dump_sql(Entity *parent, FILE *sqllog, size_t &count) {
-        ++count;
-        fprintf(sqllog,
-            "INSERT INTO file(entry_offset, parent_directory_offset, name, data_offset, data_len, is_contiguous, is_copied_off) VALUES "
-            "                (0x%016lx, 0x%016lx, \"%s\", 0x%016lx, 0x%016lx, %d, 0);\n",
-            this->_offset, parent->get_offset(), this->get_name().c_str(), this->get_data_offset(), this->get_data_length(), this->is_contiguous() ? 1 : 0
-        );
-    }
     virtual std::string to_string() const { return "FILE"; }
 };
 
@@ -191,38 +176,15 @@ public:
         delete this->_children[child->get_offset()];
     }
     bool is_full() const { return _children.size() >= 254; } // ?
-    virtual size_t count_nodes() const {
-        size_t count = 1;
-        for (auto [ofs, ent] : _children) {
-            count += ent->count_nodes();
-        }
-        return count;
-    }
-    // bad idea
-    virtual void dump_sql(Entity *parent, FILE *sqllog, size_t &count) {
-        fprintf(sqllog,
-            "INSERT INTO directory(entry_offset, parent_directory_offset, name) VALUES "
-            "                (0x%016lx, 0x%016lx, \"%s\");\n",
-            this->get_offset(), parent->get_offset(), this->get_name().c_str()
-        );
-        for (auto [ofs, ent] : _children) {
-            ent->dump_sql(this, sqllog, count);
-        }
-    }
-    virtual std::string to_string() const { return "DIRECTORY"; }
 
-    void resolve_children(mariadb::connection_ref & conn) {
-        //mariadb::statement_ref fsr = conn->create_statement("select * from file where parent_directory_offset = ?");
-        //fsr->set_unsigned64(0, _offset);
-        //mariadb::result_set_ref rsf = fsr->query();
-    }
+    virtual std::string to_string() const { return "DIRECTORY"; }
 
     void dump_files(uint8_t *mmap, const std::string &abs_dir, std::function<void(File*)> yield, bool actually_copy) {
         for (auto [ofs, ent]: _children) {
             if (typeid(*ent) == typeid(File)) {
                 File *f = reinterpret_cast<File*>(ent);
                 if (f->is_contiguous()) {
-                    if (actually_copy || f->_name == "00803.m2ts") { //hacky restart midway through
+                    if (actually_copy) { //hacky restart midway through
                         std::string path = abs_dir + "/" + f->get_name();
                         std::cout << "writing " << path << std::endl;
                         uint8_t *data = f->get_data_ptr(mmap);
@@ -239,10 +201,10 @@ public:
                         fclose(output);
                         std::cout << "wrote file " << path << std::endl;
                     }
-                    yield(f);
                 } else {
                     std::cerr << "Non-contiguous file: " << f->get_name() << std::endl;
                 }
+                yield(f);
             } else if (typeid(*ent) == typeid(Directory)) {
                 Directory *d = reinterpret_cast<Directory*>(ent);
                 std::cout << "writing dir " << d->_name << std::endl;
