@@ -59,9 +59,8 @@ void Database::rescue_music() {
         if (d == nullptr) {
             continue;
         }
-        //d->resolve_children(_conn);
         std::string name = std::string(d->_name.c_str());
-        stub.dump_directory(d, name, onFileCopied);
+        stub.dump_directory(d, name, onFileCopied, false);
         txref->commit();
     }
     //rs = _conn->query("SELECT id, parent_directory_offset FROM file");
@@ -72,11 +71,15 @@ void Database::rescue_photos() {
     stub.open("/dev/sdb");
 
     mariadb::statement_ref stmt = _conn->create_statement("update file set is_copied_off = 1 where file.entry_offset = ?");
+    mariadb::statement_ref frag_stmt = _conn->create_statement("update file set is_contiguous = ? where file.entry_offset = ?");
     mariadb::statement_ref dir_stmt = _conn->create_statement("select entry_offset, parent_directory_offset from directory where entry_offset = ?");
     uint64_t count = 0;
-    std::function<void(File*)> onFileCopied = [&stmt, &count](File *f){
-        stmt->set_unsigned64(0, f->_offset);
-        stmt->execute();
+    std::function<void(File*)> onFileCopied = [&stmt, &frag_stmt, &count](File *f){
+        //stmt->set_unsigned64(0, f->_offset);
+        //stmt->execute();
+        frag_stmt->set_unsigned8(0, f->_contiguous);
+        frag_stmt->set_unsigned64(1, f->_offset);
+        frag_stmt->execute();
         if (++count % 1000 == 0) {
             std::cout << "counted " << count << std::endl;
         }
@@ -92,7 +95,7 @@ void Database::rescue_photos() {
         if (d == nullptr) {
             std::cerr << "failed to load directory pdo = " << pdo << std::endl;
         }
-        stub.dump_directory(d, std::string(d->_name.c_str()), onFileCopied);
+        stub.dump_directory(d, std::string(d->_name.c_str()), onFileCopied, false);
         delete d;
     }
 }

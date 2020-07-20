@@ -48,3 +48,4 @@ orphan.log*
 *.log
 .vscode
 *.code-workspace
+.idea/
