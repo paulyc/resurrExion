@@ -141,6 +141,24 @@ public:
         Entity(offset, fde) {}
     virtual ~File() {}
     virtual std::string to_string() const { return "FILE"; }
+    void copy_to_dir(uint8_t *mmap, const std::string &abs_dir) {
+        std::string path = abs_dir + "/" + this->get_name();
+        std::cout << "writing " << path << std::endl;
+        uint8_t *data = this->get_data_ptr(mmap);
+        size_t sz = this->get_data_length();
+        FILE *output = fopen(path.c_str(), "wb");
+        while (sz > 0) {
+            size_t write = sz < 0x1000 ? sz : 0x1000;
+            size_t ret = fwrite(data, 1, write, output);
+            if (ret != write) {
+                throw std::runtime_error("failed copying file " + std::to_string(_offset));
+            }
+            data += write;
+            sz -= write;
+        }
+        fclose(output);
+        std::cout << "wrote file " << path << std::endl;
+    }
 };
 
 class Directory:public Entity{
@@ -185,21 +203,7 @@ public:
                 File *f = reinterpret_cast<File*>(ent);
                 if (f->is_contiguous()) {
                     if (actually_copy) { //hacky restart midway through
-                        std::string path = abs_dir + "/" + f->get_name();
-                        std::cout << "writing " << path << std::endl;
-                        uint8_t *data = f->get_data_ptr(mmap);
-                        size_t sz = f->get_data_length();
-                        FILE *output = fopen(path.c_str(), "wb");
-                        while (sz > 0) {
-                            size_t write = sz < 0x1000 ? sz : 0x1000;
-                            fwrite(data, 1, write, output);
-
-                            data += write;
-                            sz -= write;
-
-                        }
-                        fclose(output);
-                        std::cout << "wrote file " << path << std::endl;
+                        f->copy_to_dir(mmap, abs_dir);
                     }
                 } else {
                     std::cerr << "Non-contiguous file: " << f->get_name() << std::endl;
