@@ -31,7 +31,7 @@
 #if 1
 int main(int argc, char *argv[]) {
     Database d("root", "root", "/run/mysqld/mysqld.sock", "resurrex");
-    d.rescue_music("/dev/sdb", "/home/paulyc/elements");
+    d.rescue_photos();
     return 0;
 }
 #else

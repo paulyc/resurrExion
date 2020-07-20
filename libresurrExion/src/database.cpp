@@ -26,12 +26,12 @@
 //
 
 #include "database.hpp"
-
+#include <unordered_set>
 
 // "root", "root", "resurrex", 0, "/run/mysqld/mysqld.sock"
 Database::Database(const std::string &user, const std::string &pass, const std::string &sock, const std::string &db) {
     mariadb::account_ref a = mariadb::account::create("", user.c_str(), pass.c_str(), db.c_str(), 0, sock.c_str());
-    a->set_auto_commit(false);
+    a->set_auto_commit(true);
     _conn = mariadb::connection::create(a);
     if (!_conn->connect()) {
         _conn = nullptr;
@@ -44,14 +44,7 @@ Database::~Database() {
     }
 }
 
-void Database::rescue_directories(const std::string &rescuedir) {
-    mariadb::result_set_ref rs = _conn->query("SELECT * FROM directory");
-    while (rs->next()) {
-        std::string name = rs->get_string("name");
-    }
-}
-
-void Database::rescue_music(const std::string &dev, const std::string &dir) {
+void Database::rescue_music() {
     //dir = "/home/paulyc/elements";
     FilesystemStub stub;
     stub.open("/dev/sdb");
@@ -73,26 +66,37 @@ void Database::rescue_music(const std::string &dev, const std::string &dir) {
     }
     //rs = _conn->query("SELECT id, parent_directory_offset FROM file");
 }
+
 void Database::rescue_photos() {
     FilesystemStub stub;
     stub.open("/dev/sdb");
-    mariadb::statement_ref stmt = _conn->create_statement("update file set is_copied_off = 1 where file.entity_offset = ?");
-    std::function<void(File*)> onFileCopied = [&stmt](File *f){stmt->set_unsigned64(0, f->_offset); stmt->execute();};
+
+    mariadb::statement_ref stmt = _conn->create_statement("update file set is_copied_off = 1 where file.entry_offset = ?");
+    mariadb::statement_ref dir_stmt = _conn->create_statement("select entry_offset, parent_directory_offset from directory where entry_offset = ?");
+    uint64_t count = 0;
+    std::function<void(File*)> onFileCopied = [&stmt, &count](File *f){
+        stmt->set_unsigned64(0, f->_offset);
+        stmt->execute();
+        if (++count % 1000 == 0) {
+            std::cout << "counted " << count << std::endl;
+        }
+    };
     //stub.parseTextLog("recovery.log");
-    mariadb::result_set_ref rs = _conn->query("select distinct(parent_directory_offset) from file where name like '%jpg' or name like '%jpeg' or name like '%png' or name like '%MOV' or name like '%mov' or name like '%mp4' or name like '%avi' or name like '%wmv'");
-    while (rs->next()) {
-        mariadb::transaction_ref txref = _conn->create_transaction();
-        mariadb::u64 pdo = rs->get_unsigned64(0);
+    //mariadb::result_set_ref rs = _conn->query("select distinct(parent_directory_offset) from file where name like '%jpg' or name like '%jpeg' or name like '%png' or name like '%mov' or name like '%mp4' or name like '%avi' or name like '%wmv' or name like '%mkv'");
+
+    mariadb::result_set_ref orphan_dirs = _conn->query("select entry_offset from directory where parent_directory_offset = 0 order by entry_offset asc");
+
+    while (orphan_dirs->next()) {
+        mariadb::u64 pdo = orphan_dirs->get_unsigned64(0);
         Directory * d = reinterpret_cast<Directory*>(stub.loadEntityOffset(pdo, "temp"));
         if (d == nullptr) {
-            continue;
+            std::cerr << "failed to load directory pdo = " << pdo << std::endl;
         }
-        //d->resolve_children(_conn);
-        std::string name = std::string(d->_name.c_str());
-        stub.dump_directory(d, name, onFileCopied);
-        txref->commit();
+        stub.dump_directory(d, std::string(d->_name.c_str()), onFileCopied);
+        delete d;
     }
 }
+
 /*
 void Database::migrate_to_sql_ids() {
     mariadb::result_set_ref rs = _conn->query("SELECT id, parent_directory_offset FROM file");
@@ -100,34 +104,4 @@ void Database::migrate_to_sql_ids() {
 
     }
 }
-void Database::gather_music() {
-    _conn->query("SELECT * FROM file WHERE name like '%flac' and parent_directory_offset = 0");
-}
-
-void Database::gather_x() {
-
-}
 */
-#if 0
-void Database::connect(const std::string &user, const std::string &pass, const std::string &sock, const std::string &db) {
-    try {
-        _conn = std::make_unique<mysqlpp::Connection>(db.c_str(), sock.c_str(), user.c_str(), pass.c_str());
-    } catch (const mysqlpp::BadQuery &ex) {
-        std::cerr << "Bad query mysql++ exception: " << ex.what() << std::endl;
-        throw ex;
-    } catch (const mysqlpp::Exception &ex) {
-        std::cerr << "General mysql++ exception: " << ex.what() << std::endl;
-        throw ex;
-    }
-}
-
-class fix_missing_parents
-{
-public:
-    fix_missing_parents() :
-};
-
-void Database::fix_parents() {
-    mysqlpp::Query q = _conn->query();
-}
-#endif

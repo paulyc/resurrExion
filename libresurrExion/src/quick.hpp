@@ -89,7 +89,7 @@ namespace {
     std::shared_ptr<Directory> RootDirectory;
 }
 
-bool is_valid_filename_char(char16_t ch) {
+inline bool is_valid_filename_char(char16_t ch) {
     switch (ch) {
     case '\'':
     case '*':
@@ -106,26 +106,10 @@ bool is_valid_filename_char(char16_t ch) {
     }
 }
 
-std::string get_utf8_filename(exfat::file_directory_entry_t *fde, struct exfat::stream_extension_entry_t *sde)
-{
-    const size_t entry_count = fde->continuations + 1;
-    // i dont know that this means anything without decoding the string because UTF-16 is so dumb re: the "emoji problem"
-    const size_t namelen = sde->name_length;
-    struct exfat::file_name_entry_t *n = reinterpret_cast<struct exfat::file_name_entry_t*>(fde);
-    std::basic_string<char16_t> u16s;
-    for (size_t c = 2; c < entry_count && u16s.length() <= namelen; ++c) {
-        if (n[c].type == exfat::FILE_NAME) {
-            for (size_t i = 0; i < exfat::file_name_entry_t::FS_FILE_NAME_ENTRY_SIZE && u16s.length() <= namelen; ++i) {
-                u16s.push_back((char16_t)n[c].name[i]);
-            }
-        }
-    }
-    return cvt.to_bytes(u16s);
-}
-
+std::string get_utf8_filename(exfat::file_directory_entry_t *fde, struct exfat::stream_extension_entry_t *sde);
 Entity * make_entity(byteofs_t offset, exfat::file_directory_entry_t *fde, const std::string &suggested_name);
 
-byteofs_t cluster_number_to_offset(clusterofs_t cluster) {
+inline byteofs_t cluster_number_to_offset(clusterofs_t cluster) {
     // have to subtract 2 because the first cluster in the cluster heap has index 2 and
     // by my definition the cluster heap simply starts there
     return ((cluster) * SectorsPerCluster + ClusterHeapStartSectorRelWholeDisk) * SectorSize;
@@ -157,7 +141,7 @@ public:
             }
         }
 
-    virtual ~Entity();
+    virtual ~Entity() {}
     virtual byteofs_t get_offset() const { return _offset; }
     virtual std::string get_name() const { return _name; }
     virtual Entity * get_parent() const { return _parent; }
@@ -236,7 +220,7 @@ class File:public Entity{
 public:
     File(byteofs_t offset, exfat::file_directory_entry_t *fde) :
         Entity(offset, fde) {}
-    virtual ~File();
+    virtual ~File() {}
     virtual size_t count_nodes() const {
         return 1;
     }
@@ -259,7 +243,11 @@ public:
         //_sde = reinterpret_cast<struct exfat::secondary_directory_entry_t*>(fde+1);
         //printf("Dir %016lx continuation count %d sde first cluster %08x data length %016lx\n", offset, get_num_continuations(), _sde->first_cluster, _sde->data_length);
     }
-    virtual ~Directory();
+    virtual ~Directory() {
+        for (const auto &child: _children) {
+            delete child.second;
+        }
+    }
 
     /*virtual uint32_t get_first_cluster() const {
         return _sde->first_cluster;
@@ -306,34 +294,39 @@ public:
         //mariadb::result_set_ref rsf = fsr->query();
     }
 
-    void dump_files(uint8_t *mmap, const std::string &dirname, std::function<void(File*)> yield) {
-        std::string abs_dir = "/home/paulyc/elements/" + dirname;
-        mkdir(abs_dir.c_str(), 0777);
+    void dump_files(uint8_t *mmap, const std::string &abs_dir, std::function<void(File*)> yield, bool actually_copy) {
         for (auto [ofs, ent]: _children) {
             if (typeid(*ent) == typeid(File)) {
                 File *f = reinterpret_cast<File*>(ent);
                 if (f->is_contiguous()) {
-                    std::string path = abs_dir + "/" + f->get_name();
-                    std::cout << "writing " << path << std::endl;
-                    uint8_t *data = f->get_data_ptr(mmap);
-                    size_t sz = f->get_data_length();
-                    FILE *output = fopen(path.c_str(), "wb");
-                    while (sz > 0) {
-                        size_t write = sz < 0x10000 ? sz : 0x10000;
-                        fwrite(data, write, 1, output);
+                    if (actually_copy || f->_name == "00803.m2ts") { //hacky restart midway through
+                        std::string path = abs_dir + "/" + f->get_name();
+                        std::cout << "writing " << path << std::endl;
+                        uint8_t *data = f->get_data_ptr(mmap);
+                        size_t sz = f->get_data_length();
+                        FILE *output = fopen(path.c_str(), "wb");
+                        while (sz > 0) {
+                            size_t write = sz < 0x1000 ? sz : 0x1000;
+                            fwrite(data, 1, write, output);
 
-                        data += write;
-                        sz -= write;
+                            data += write;
+                            sz -= write;
 
+                        }
+                        fclose(output);
+                        std::cout << "wrote file " << path << std::endl;
                     }
-                    fclose(output);
-                    std::cout << "wrote " << path << std::endl;
                     yield(f);
                 } else {
                     std::cerr << "Non-contiguous file: " << f->get_name() << std::endl;
                 }
             } else if (typeid(*ent) == typeid(Directory)) {
-                // recurse later
+                Directory *d = reinterpret_cast<Directory*>(ent);
+                std::cout << "writing dir " << d->_name << std::endl;
+                std::string new_abs_dir = abs_dir + std::string("/") + std::string(d->_name.c_str());
+                mkdir(new_abs_dir.c_str(), 0777);
+                d->dump_files(mmap, new_abs_dir, yield, actually_copy);
+                std::cout << "done writing dir " << d->_name << std::endl;
             }
         }
     }
@@ -347,29 +340,7 @@ private:
     bool _dirty;
 };
 
-Entity::~Entity() {}
-File::~File() {}
-Directory::~Directory() {}
 
-// TODO log these so i can stop running the whole disk
-Entity * make_entity(byteofs_t offset, exfat::file_directory_entry_t *fde, const std::string &suggested_name) {
-    if (fde->attribute_flags & exfat::DIRECTORY) {
-        Directory *newdir = new Directory(offset, fde);
-        //if (newdir->get_parent() == RootDirectory.get()) {
-        //    RootDirectory->add_child(newdir);
-        //}
-        newdir->load_name(suggested_name);
-
-        return newdir;
-    } else {
-        File *newfile = new File(offset, fde);
-        //if (newfile->get_parent() == RootDirectory.get()) {
-        //    RootDirectory->add_child(newfile);
-        //}
-        newfile->load_name(suggested_name);
-        return newfile;
-    }
-}
 
 class FilesystemStub
 {
@@ -430,10 +401,13 @@ public:
     }
 
     bool checkIntegrity() const {
+        return false;
+        /*
         const size_t root_node_count = RootDirectory->count_nodes();
         const size_t entity_node_count = this->_entities_to_offsets.size();
         std::cerr << "checkIntegrity: root_node_count: " << root_node_count << " entity_node_count: " << std::endl;
         return root_node_count == entity_node_count;
+        */
     }
 
     bool parseTextLog(const std::string &filename)
@@ -486,7 +460,7 @@ public:
 
     void log_sql(const char *sqlfilename) {
         std::cerr << "log_sql" << std::endl;
-        FILE *sqllog = fopen(sqlfilename, "w");
+        /*FILE *sqllog = fopen(sqlfilename, "w");
         fprintf(sqllog, "SET autocommit=0;\n"
                         "SET unique_checks=0;\n"
                         "SET foreign_key_checks=0;\n"
@@ -541,9 +515,9 @@ public:
             }
         }
         fprintf(sqllog, "COMMIT;\n");
-        fclose(sqllog);
+        fclose(sqllog);*/
     }
-
+#if 0
     void log_results(const char *orphanlogfilename) {
         std::cerr << "find_orphans" << std::endl;
         FILE *orphanlog = fopen(orphanlogfilename, "w");
@@ -613,7 +587,7 @@ public:
     void dirty_writeback() {
 
     }
-
+#endif
     // confirmed working by checksumming a known file...
     std::vector<uint8_t> read_file_contents(File *f) {
         std::vector<uint8_t> contents(f->get_data_length());
@@ -623,15 +597,17 @@ public:
     }
 
     void dump_directory(Directory *d, const std::string &dirname, std::function<void(File*)> yield) {
-        d->dump_files(_mmap, dirname, yield);
+        std::string abs_dir = "/home/paulyc/elements/" + dirname + std::string("-") + std::to_string(d->_offset);
+        mkdir(abs_dir.c_str(), 0777);
+        d->dump_files(_mmap, abs_dir, yield, d->_offset > 2552679676992);
     }
 
     Entity * loadEntityOffset(byteofs_t entity_offset, const std::string &suggested_name) {
         //fprintf(stderr, "loadEntityOffset[%016lld]\n", entity_offset);
-        auto loaded_entity = _offsets_to_entities.find(entity_offset);
-        if (loaded_entity != _offsets_to_entities.end()) {
-            return loaded_entity->second;
-        }
+    //    auto loaded_entity = _offsets_to_entities.find(entity_offset);
+    //    if (loaded_entity != _offsets_to_entities.end()) {
+    //        return loaded_entity->second;
+    //    }
 
         uint8_t *entity_start = _mmap + entity_offset;
 
@@ -669,24 +645,16 @@ public:
         }
 
         Entity *ent = make_entity(entity_offset, fde, suggested_name);
-        _entities_to_offsets[ent] = entity_offset;
-        _offsets_to_entities[entity_offset] = ent;
+        //_entities_to_offsets[ent] = entity_offset;
+        //_offsets_to_entities[entity_offset] = ent;
         if (typeid(*ent) == typeid(Directory)) {
             Directory *d = dynamic_cast<Directory*>(ent);
             this->load_directory(d);
 
         } else if (typeid(*ent) == typeid(File)) {
             File *f = dynamic_cast<File*>(ent);
-
-            if (this->should_write_file_data(f)) {
-                this->write_file_data(f, "wt.dts");
-            }
         }
         return ent;
-    }
-
-    bool should_write_file_data(File *) const {
-        return false;
     }
 
     void write_file_data(File *f, const std::string &filename) {
@@ -761,8 +729,8 @@ public:
     uint8_t *_partition_start;
     uint8_t *_partition_end;
     std::vector<char16_t> _invalid_file_name_characters;
-    std::unordered_map<Entity*, byteofs_t> _entities_to_offsets;
-    std::unordered_map<byteofs_t, Entity*> _offsets_to_entities;
+    //std::unordered_map<Entity*, byteofs_t> _entities_to_offsets;
+    //std::unordered_map<byteofs_t, Entity*> _offsets_to_entities;
 };
 
 #endif
