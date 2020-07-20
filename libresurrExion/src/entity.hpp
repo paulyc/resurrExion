@@ -123,14 +123,8 @@ public:
 
     void add_child(std::shared_ptr<BaseEntity> child, bool dirty=false) { _children.push_back(child); _dirty |= dirty; }
     const std::list<std::shared_ptr<BaseEntity>> &get_children() const { return _children; }
-    virtual Type get_type() const{
+    virtual Type get_type() const {
         return Directory;
-    }
-
-    void dirty_writeback() {
-         if (_dirty) {
-             _dirty = false;
-         }
     }
 
 protected:

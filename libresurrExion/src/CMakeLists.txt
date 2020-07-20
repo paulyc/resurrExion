@@ -26,14 +26,19 @@ add_library(resurrExion SHARED
     libmain.cpp
     ../../config/fsconfig.hpp
     entity.hpp
+    entity.cpp
     exfat_structs.hpp
     exception.hpp
+    exception.cpp
     filesystem.hpp
     journal.hpp
+    journal.cpp
     logger.hpp
+    logger.cpp
     recoverylog.hpp
-    circbuf.hpp
+    recoverylog.cpp
     types.hpp
+    types.cpp
     database.cpp
     database.hpp
     quick.hpp
