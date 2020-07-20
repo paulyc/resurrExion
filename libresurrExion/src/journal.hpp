@@ -122,4 +122,6 @@ private:
 } /* namespace paulyc */
 } /* namespace github */
 
+#include "journal.cpp"
+
 #endif /* _github_paulyc_journal_hpp_ */

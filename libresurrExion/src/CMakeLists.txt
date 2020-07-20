@@ -32,7 +32,6 @@ add_library(resurrExion SHARED
     exception.cpp
     filesystem.hpp
     journal.hpp
-    journal.cpp
     logger.hpp
     logger.cpp
     recoverylog.hpp
@@ -43,6 +42,10 @@ add_library(resurrExion SHARED
     database.hpp
     quick.hpp
     quick.cpp
+    quickentity.cpp
+    quickentity.hpp
+    quickfs.cpp
+    quickfs.hpp
 )
 
 #set_source_files_properties(${LIB_HEADERS} PROPERTIES HEADER_FILE_ONLY TRUE)
