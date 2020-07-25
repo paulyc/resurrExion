@@ -35,11 +35,6 @@
 #include <log4cplus/initializer.h>
 #endif
 
-#include <cstdarg>
-#include <chrono>
-#include <iomanip>
-#include <memory>
-#include <sstream>
 #include <iostream>
 
 namespace github {
@@ -51,7 +46,7 @@ public:
     LoggerInterface() = default;
     virtual ~LoggerInterface() = default;
 
-    virtual void writeToLog(const std::string &msg) {}
+    virtual void writeToLog(const std::string &msg) = 0;
 };
 
 #if USE_LOG4CPLUS
@@ -80,14 +75,7 @@ typedef ConsoleInterface DefaultLoggerInterface;
 
 #endif
 
-namespace {
-    LoggerInterface *logger = new DefaultLoggerInterface;
-
-    LoggerInterface * getLoggerInterface()
-    {
-        return logger;
-    }
-}
+LoggerInterface * getLoggerInterface();
 
 class Loggable
 {
@@ -101,68 +89,13 @@ public:
         CRITICAL = 6
     };
 
-    Loggable() :
-        _level(DEBUG_),
-        _type_str(typeid(this).name())
-    {
-    }
+    Loggable();
 
     ~Loggable() = default;
 
-    void logf(LogLevel l, const char *fmt, ...)
-    {
-        if (l < _level) return;
+    void logf(LogLevel l, const char *fmt, ...);
 
-        std::ostringstream prefix;
-        char msg[4096];
-
-        formatLogPrefix(prefix, _level);
-
-        va_list args;
-        va_start(args, fmt);
-        int n = vsnprintf(msg, sizeof(msg), fmt, args);
-        va_end(args);
-
-        if (n > sizeof(msg)) {
-            char *tmpMsg = new char[n+1];
-            va_start(args, fmt);
-            vsnprintf(tmpMsg, n, fmt, args);
-            va_end(args);
-            getLoggerInterface()->writeToLog(prefix.str() + std::string(tmpMsg));
-            delete[] tmpMsg;
-        } else {
-            getLoggerInterface()->writeToLog(prefix.str() + std::string(msg));
-        }
-    }
-
-    void formatLogPrefix(std::ostringstream &prefix, LogLevel l) {
-        switch (l) {
-            case TRACE:
-                prefix << "[TRACE]    [";
-                break;
-            case DEBUG_:
-                prefix << "[DEBUG]    [";
-                break;
-            case INFO:
-                prefix << "[INFO]     [";
-                break;
-            case WARN:
-                prefix << "[WARN]     [";
-                break;
-            case ERROR:
-                prefix << "[ERROR]    [";
-                break;
-            case CRITICAL:
-                prefix << "[CRITICAL] [";
-                break;
-            default:
-                prefix << "[UNKNOWN]  [";
-                break;
-        }
-
-        std::time_t current_tm = std::time(nullptr);
-        prefix << std::put_time(std::localtime(&current_tm), "%F %T%z") << "] ";// << "] [" << _type_str << "] ";
-    }
+    void formatLogPrefix(std::ostringstream &prefix, LogLevel l);
 
     void setLogLevel(LogLevel l) { _level = l; }
 private:

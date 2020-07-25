@@ -26,6 +26,11 @@
 //
 
 #include "quickentity.hpp"
+#include "crc32.hpp"
+
+namespace {
+crc32 c32;
+}
 
 Entity * make_entity(byteofs_t offset, exfat::file_directory_entry_t *fde, const std::string &suggested_name) {
     if (fde->attribute_flags & exfat::DIRECTORY) {
@@ -44,4 +49,29 @@ Entity * make_entity(byteofs_t offset, exfat::file_directory_entry_t *fde, const
         newfile->load_name(suggested_name);
         return newfile;
     }
+}
+
+void File::copy_to_dir(uint8_t *mmap, const std::string &abs_dir) {
+    std::string path = abs_dir + "/" + this->get_name();
+    std::cout << "writing " << path << std::endl;
+    uint8_t *data = this->get_data_ptr(mmap);
+    size_t sz = this->get_data_length();
+    FILE *output = fopen(path.c_str(), "wb");
+    while (sz > 0) {
+        size_t write = sz < 0x1000 ? sz : 0x1000;
+        size_t ret = fwrite(data, 1, write, output);
+        if (ret != write) {
+            throw std::runtime_error("failed copying file " + std::to_string(_offset));
+        }
+        data += write;
+        sz -= write;
+    }
+    fclose(output);
+    std::cout << "wrote file " << path << std::endl;
+}
+
+uint32_t File::data_crc32(uint8_t *mmap) {
+    uint8_t *data = this->get_data_ptr(mmap);
+    size_t sz = this->get_data_length();
+    return c32.compute((const char *)data, sz);
 }
