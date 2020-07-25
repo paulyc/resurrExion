@@ -90,6 +90,7 @@ public:
     void rescue_music();
     void rescue_orphan_dirs(const char *dev);
     void rescue_orphan_files(const char *dev, const char *dir);
+    void rescue_dupe_orphan_files(const char *dev, const char *dir);
 //private:
     mariadb::connection_ref _conn;
 };

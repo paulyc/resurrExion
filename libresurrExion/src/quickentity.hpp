@@ -51,7 +51,7 @@ public:
             if (_alloc_possible) {
                 _first_cluster = _streamext->first_cluster;
                 _data_length = _streamext->size;
-                std::cout << "size: " << _streamext->size << " valid_size: " << _streamext->valid_size << std::endl;
+                std::cout << "size: " << _streamext->size << " valid_size: " << _streamext->valid_size << " fde: " << fde << std::endl;
                 if (_first_cluster == 0) {
                     _data_offset = offset + static_cast<uint64_t>((_fde->continuations + 2)*sizeof(exfat::file_directory_entry_t));
                 } else {
@@ -141,24 +141,8 @@ public:
         Entity(offset, fde) {}
     virtual ~File() {}
     virtual std::string to_string() const { return "FILE"; }
-    void copy_to_dir(uint8_t *mmap, const std::string &abs_dir) {
-        std::string path = abs_dir + "/" + this->get_name();
-        std::cout << "writing " << path << std::endl;
-        uint8_t *data = this->get_data_ptr(mmap);
-        size_t sz = this->get_data_length();
-        FILE *output = fopen(path.c_str(), "wb");
-        while (sz > 0) {
-            size_t write = sz < 0x1000 ? sz : 0x1000;
-            size_t ret = fwrite(data, 1, write, output);
-            if (ret != write) {
-                throw std::runtime_error("failed copying file " + std::to_string(_offset));
-            }
-            data += write;
-            sz -= write;
-        }
-        fclose(output);
-        std::cout << "wrote file " << path << std::endl;
-    }
+    void copy_to_dir(uint8_t *mmap, const std::string &abs_dir);
+    uint32_t data_crc32(uint8_t *mmap);
 };
 
 class Directory:public Entity{

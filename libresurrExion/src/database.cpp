@@ -75,19 +75,22 @@ void Database::rescue_orphan_dirs(const char *dev) {
     mariadb::statement_ref dir_stmt = _conn->create_statement("select entry_offset, parent_directory_offset from directory where entry_offset = ?");
     uint64_t count = 0;
     std::function<void(File*)> onFileCopied = [&stmt, &frag_stmt, &count](File *f){
-        //stmt->set_unsigned64(0, f->_offset);
-        //stmt->execute();
-        frag_stmt->set_unsigned8(0, f->_contiguous);
-        frag_stmt->set_unsigned64(1, f->_offset);
-        frag_stmt->execute();
+        stmt->set_unsigned64(0, f->_offset);
+        stmt->execute();
+        //frag_stmt->set_unsigned8(0, f->_contiguous);
+        //frag_stmt->set_unsigned64(1, f->_offset);
+        //frag_stmt->execute();
         if (++count % 1000 == 0) {
             std::cout << "counted " << count << std::endl;
         }
     };
     //stub.parseTextLog("recovery.log");
-    //mariadb::result_set_ref rs = _conn->query("select distinct(parent_directory_offset) from file where name like '%jpg' or name like '%jpeg' or name like '%png' or name like '%mov' or name like '%mp4' or name like '%avi' or name like '%wmv' or name like '%mkv'");
+    //mariadb::result_set_ref rs = _conn->query(
+    //"select distinct(parent_directory_offset) from file where name like '%jpg' or name like '%jpeg' or name like '%png' or name like '%mov' or name like '%mp4' or name like '%avi' or name like '%wmv' or name like '%mkv'");
 
-    mariadb::result_set_ref orphan_dirs = _conn->query("select entry_offset from directory where parent_directory_offset = 0 order by entry_offset asc");
+    mariadb::result_set_ref orphan_dirs = _conn->query(
+                "select entry_offset from directory where parent_directory_offset = 0 order by entry_offset asc"
+                );
 
     while (orphan_dirs->next()) {
         mariadb::u64 pdo = orphan_dirs->get_unsigned64(0);
@@ -100,12 +103,64 @@ void Database::rescue_orphan_dirs(const char *dev) {
     }
 }
 
+static void copy_files(std::list<File*> &files, uint8_t *mmap, const char *dir) {
+    for (File *f: files) {
+        f->copy_to_dir(mmap, dir);
+        std::cout << "wrote " << f->_name << " offset " << f->_offset << std::endl;
+    }
+}
+
+void Database::rescue_dupe_orphan_files(const char *dev, const char *dir) {
+    FilesystemStub stub;
+    stub.open(dev);
+
+    mariadb::result_set_ref orphan_files = _conn->query(
+                "select count(*) c, name from file where parent_directory_offset = 0 group by name order by c asc");
+    mariadb::statement_ref dupes_stmt = _conn->create_statement("select entry_offset from file where name = ?");
+    while (orphan_files->next()) {
+        mariadb::u64 count = orphan_files->get_unsigned64("c");
+        if (count > 1) {
+            std::string name = orphan_files->get_string("name");
+            dupes_stmt->set_string(0, name);
+            mariadb::result_set_ref dupes = dupes_stmt->query();
+            std::list<File*> files;
+            while (dupes->next()) {
+                mariadb::u64 pdo = dupes->get_unsigned64(0);
+                File * f = reinterpret_cast<File*>(stub.loadEntityOffset(pdo, "temp"));
+                if (f == nullptr) {
+                    std::cerr << "failed to load file pdo = " << pdo << std::endl;
+                }
+                //f->_name += std::to_string(count++);
+                f->_name = std::to_string(pdo) + std::string("-") + f->_name;
+                files.push_back(f);
+            }
+            std::list<File*>::iterator it = files.begin();
+            //uint32_t crc = (*it)->data_crc32(stub._mmap);
+            uint32_t crc = (*it)->_data_length;
+            for (;it != files.end(); ++it) {
+                //uint32_t c = (*it)->data_crc32(stub._mmap);
+                uint32_t c = (*it)->_data_length;
+                if (c != crc) {
+                    std::cout << "no match len " << crc << " and " << c << std::endl;
+                    copy_files(files, stub._mmap, dir);
+                    break;
+                }
+            }
+            for (File *f: files) {
+                delete f;
+            }
+        }
+    }
+}
+
 void Database::rescue_orphan_files(const char *dev, const char *dir) {
     FilesystemStub stub;
     stub.open(dev);
 
-    mariadb::statement_ref stmt = _conn->create_statement("update file set is_copied_off = 1 where file.entry_offset = ?");
-    mariadb::statement_ref dir_stmt = _conn->create_statement("select entry_offset, parent_directory_offset from directory where entry_offset = ?");
+    mariadb::statement_ref stmt = _conn->create_statement(
+                "update file set is_copied_off = 1 where file.entry_offset = ?");
+    mariadb::statement_ref dir_stmt = _conn->create_statement(
+                "select entry_offset, parent_directory_offset from directory where entry_offset = ?");
     uint64_t count = 0;
     std::function<void(File*)> onFileCopied = [&stmt, &count](File *f){
         stmt->set_unsigned64(0, f->_offset);
@@ -114,7 +169,8 @@ void Database::rescue_orphan_files(const char *dev, const char *dir) {
             std::cout << "counted " << count << std::endl;
         }
     };
-    mariadb::result_set_ref orphan_files = _conn->query("select entry_offset from file where is_contiguous = 1 and is_copied_off = 0 order by entry_offset asc ");
+    mariadb::result_set_ref orphan_files = _conn->query(
+                "select entry_offset from file where is_contiguous = 1 and is_copied_off = 0 and entry_offset > 237329123584 order by entry_offset asc ");
 
     while (orphan_files->next()) {
         mariadb::u64 pdo = orphan_files->get_unsigned64(0);
@@ -123,6 +179,8 @@ void Database::rescue_orphan_files(const char *dev, const char *dir) {
             std::cerr << "failed to load file pdo = " << pdo << std::endl;
         }
         f->copy_to_dir(stub._mmap, dir);
+        onFileCopied(f);
+        std::cout << "wrote " << f->_offset << std::endl;
        // stub.dump_directory(d, std::string(d->_name.c_str()), onFileCopied, false);
         delete f;
     }
