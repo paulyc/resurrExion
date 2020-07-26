@@ -31,7 +31,7 @@
 #include <string>
 #include <memory>
 
-#include <mariadb++/connection.hpp>
+#include <mariadbcpp/ConnCpp.h>
 
 #include "quick.hpp"
 
@@ -92,7 +92,7 @@ public:
     void rescue_orphan_files(const char *dev, const char *dir);
     void rescue_dupe_orphan_files(const char *dev, const char *dir);
 //private:
-    mariadb::connection_ref _conn;
+    sql::Connection *_conn;
 };
 
 #endif /* _github_paulyc_database_hpp_ */
