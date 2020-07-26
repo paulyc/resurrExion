@@ -54,4 +54,4 @@ add_library(resurrExion SHARED
 
 #set_source_files_properties(${LIB_HEADERS} PROPERTIES HEADER_FILE_ONLY TRUE)
 target_include_directories(resurrExion PUBLIC /usr/include/mysql)
-target_link_libraries(resurrExion -lmysqlpp)
+target_link_libraries(resurrExion -lmariadb -lmariadbcpp -lmysqlclient)
