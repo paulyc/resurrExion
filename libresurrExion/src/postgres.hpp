@@ -1,13 +1,10 @@
 //
-//  crc32.hpp
+//  postgres.hpp
 //  resurrExion
 //
-//  Created by Paul Ciarlo on 25 July 2020
+//  Created by Paul Ciarlo on 26 July 2019
 //
-//  Copyright (C) 2016-2019 Alex I. Kuznetsov
 //  Copyright (C) 2020 Paul Ciarlo <paul.ciarlo@gmail.com>
-//
-//  See https://lxp32.github.io/docs/a-simple-example-crc32-calculation/
 //
 //  Permission is hereby granted, free of charge, to any person obtaining a copy
 //  of this software and associated documentation files (the "Software"), to deal
@@ -28,19 +25,14 @@
 //  SOFTWARE.
 //
 
-#ifndef RESURREX_CRC32_HPP
-#define RESURREX_CRC32_HPP
+#ifndef RESURREX_POSTGRES_HPP
+#define RESURREX_POSTGRES_HPP
 
-#include <stdint.h>
-#include <stddef.h>
 
-class crc32
+class postgres
 {
 public:
-    crc32();
-    uint32_t compute(const char *s,size_t n);
-private:
-    uint32_t _table[256];
+    postgres();
 };
 
-#endif // RESURREX_CRC32_HPP
+#endif // RESURREX_POSTGRES_HPP

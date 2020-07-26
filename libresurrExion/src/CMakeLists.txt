@@ -48,6 +48,8 @@ add_library(resurrExion SHARED
     quickfs.hpp
     crc32.cpp
     crc32.hpp
+    postgres.cpp
+    postgres.hpp
 )
 
 #set_source_files_properties(${LIB_HEADERS} PROPERTIES HEADER_FILE_ONLY TRUE)
