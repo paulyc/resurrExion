@@ -77,9 +77,6 @@ constexpr static size_t ClusterHeapStartSector = 0x283D8; // relative to partiti
 constexpr static size_t DiskSize               = (NumSectors + PartitionStartSector) * SectorSize;
 */
 
-constexpr static size_t ClusterHeapStartSectorRelWholeDisk = PartitionStartSector + ClusterHeapStartSector;
-constexpr static size_t ClusterHeapStartOffset = ClusterHeapStartSectorRelWholeDisk * SectorSize;
-
 class Entity;
 class File;
 class Directory;

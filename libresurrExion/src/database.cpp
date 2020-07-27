@@ -198,8 +198,48 @@ void Database::rescue_orphan_files(const char *dir) {
     s->close();
 }
 
-void Database::fill_allocated_clusters() {
+static constexpr clusterofs_t NumClusters = 15260537;
 
+void Database::fill_allocated_clusters() {
+    sql::Statement *s = _conn->createStatement();
+    sql::PreparedStatement *ps = _conn->prepareStatement("insert into cluster(cluster, allocated, file) values(?, ?, ?)");
+    sql::ResultSet *rs = s->executeQuery(
+                "select entry_offset, name, data_offset, data_len, is_contiguous from file order by entry_offset asc"
+                );
+    while (rs->next()) {
+        byteofs_t entry_offset = rs->getUInt64("entry_offset");
+        sql::SQLString name = rs->getString("name");
+        byteofs_t data_offset = rs->getUInt64("data_offset");
+        ssize_t data_len = rs->getUInt64("data_len");
+        int is_contiguous = rs->getInt("is_contiguous");
+        clusterofs_t c = (data_offset - ClusterHeapStartOffset) / ClusterSize;
+        do {
+            ps->setUInt64(1, c);
+            ps->setInt(2, 1);
+            ps->setUInt64(3, entry_offset);
+            ps->execute();
+            data_len -= ClusterSize;
+            ++c;
+            std::cout << "insert into cluster(cluster, allocated, file) values(" << c << ", 1, " << entry_offset << ")" << std::endl;
+        } while (is_contiguous && data_len > 0);
+    }
+    rs->close();
+    ps->close();
+    s->close();
+}
+
+void Database::init_cluster_table() {
+    sql::Statement *s = _conn->createStatement();
+    s->executeQuery("alter table cluster disable keys");
+    sql::PreparedStatement *ps = _conn->prepareStatement("insert into cluster() values()");
+    for (clusterofs_t c = 0; c < NumClusters; ++c) {
+        //ps->setUInt64(0, c);
+        ps->execute();
+        if (c % 1000) {
+            std::cout << c << std::endl;
+        }
+    }
+    s->executeQuery("alter table cluster enable keys");
 }
 
 /*

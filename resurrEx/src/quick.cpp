@@ -30,8 +30,9 @@
 
 #if 1
 int main(int argc, char *argv[]) {
-    Database d("/dev/sde", "root", "root", "/run/mysqld/mysqld.sock", "resurrex");
-    d.rescue_dupe_orphan_files("/barracuda/rescuefiles/files/dupes");
+    Database d("/dev/sdb", "root", "root", "/run/mysqld/mysqld.sock", "resurrex");
+    d.fill_allocated_clusters();
+    //d.rescue_dupe_orphan_files("/barracuda/rescuefiles/files/dupes");
     return 0;
 }
 #else
