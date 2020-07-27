@@ -32,7 +32,6 @@ add_library(resurrExion SHARED
     exception.cpp
     filesystem.hpp
     journal.hpp
-    journal.cpp
     logger.hpp
     logger.cpp
     recoverylog.hpp
@@ -43,8 +42,18 @@ add_library(resurrExion SHARED
     database.hpp
     quick.hpp
     quick.cpp
+    quickentity.cpp
+    quickentity.hpp
+    quickfs.cpp
+    quickfs.hpp
+    crc32.cpp
+    crc32.hpp
+    postgres.cpp
+    postgres.hpp
+    filetype.cpp
+    filetype.hpp
 )
 
 #set_source_files_properties(${LIB_HEADERS} PROPERTIES HEADER_FILE_ONLY TRUE)
 target_include_directories(resurrExion PUBLIC /usr/include/mysql)
-target_link_libraries(resurrExion -lmysqlpp)
+target_link_libraries(resurrExion -lmariadb -lmariadbcpp -lmysqlclient)

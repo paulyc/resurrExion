@@ -31,7 +31,7 @@
 #include <string>
 #include <memory>
 
-#include <mariadb++/connection.hpp>
+#include <mariadbcpp/ConnCpp.h>
 
 #include "quick.hpp"
 
@@ -79,19 +79,55 @@ struct File
 {
 };
 
+/*
+-- -----------------------------------------------------
+-- Table `cluster`
+-- -----------------------------------------------------
+CREATE TABLE IF NOT EXISTS `cluster` (
+  `id` BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
+  `allocated` TINYINT(1) NULL,
+  `type` VARCHAR(255) NULL,
+  `next` BIGINT(20) UNSIGNED NULL,
+  `file` BIGINT(20) UNSIGNED NULL,
+  PRIMARY KEY (`id`),
+  INDEX `index2` (`cluster` ASC),
+  INDEX `index3` (`type` ASC),
+  INDEX `fk_cluster_1_idx` (`next` ASC),
+  INDEX `fk_cluster_2_idx` (`file` ASC),
+  CONSTRAINT `fk_cluster_1`
+    FOREIGN KEY (`next`)
+    REFERENCES `cluster` (`cluster`)
+    ON DELETE RESTRICT
+    ON UPDATE RESTRICT,
+  CONSTRAINT `fk_cluster_2`
+    FOREIGN KEY (`file`)
+    REFERENCES `file` (`entry_offset`)
+    ON DELETE RESTRICT
+    ON UPDATE RESTRICT)
+ENGINE = InnoDB
+DEFAULT CHARACTER SET = utf8mb4;
+*/
+struct Cluster
+{
+};
+
 }
 
 class Database
 {
 public:
-    Database(const std::string &user, const std::string &pass, const std::string &sock, const std::string &db);
+    Database(const std::string &dev, const std::string &user, const std::string &pass, const std::string &sock, const std::string &db);
     ~Database();
     //void migrate_to_sql_ids();
     void rescue_music();
-    void rescue_photos();
-    //void rescue_x();
+    void rescue_orphan_dirs();
+    void rescue_orphan_files(const char *dir);
+    void rescue_dupe_orphan_files(const char *dir);
+    void fill_allocated_clusters();
+    void init_cluster_table();
 //private:
-    mariadb::connection_ref _conn;
+    sql::Connection *_conn;
+    FilesystemStub _stub;
 };
 
 #endif /* _github_paulyc_database_hpp_ */

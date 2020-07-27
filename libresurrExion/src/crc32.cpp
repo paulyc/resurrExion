@@ -1,10 +1,13 @@
 //
-//  quick.cpp
+//  crc32.cpp
 //  resurrExion
 //
-//  Created by Paul Ciarlo on 14 July 2020
+//  Created by Paul Ciarlo on 25 July 2020
 //
+//  Copyright (C) 2016-2019 Alex I. Kuznetsov
 //  Copyright (C) 2020 Paul Ciarlo <paul.ciarlo@gmail.com>
+//
+//  See https://lxp32.github.io/docs/a-simple-example-crc32-calculation/
 //
 //  Permission is hereby granted, free of charge, to any person obtaining a copy
 //  of this software and associated documentation files (the "Software"), to deal
@@ -25,21 +28,31 @@
 //  SOFTWARE.
 //
 
-#include "quick.hpp"
+#include "crc32.hpp"
 
-std::string get_utf8_filename(exfat::file_directory_entry_t *fde, struct exfat::stream_extension_entry_t *sde)
+crc32::crc32()
 {
-    const size_t entry_count = fde->continuations + 1;
-    // i dont know that this means anything without decoding the string because UTF-16 is so dumb re: the "emoji problem"
-    const size_t namelen = sde->name_length;
-    struct exfat::file_name_entry_t *n = reinterpret_cast<struct exfat::file_name_entry_t*>(fde);
-    std::basic_string<char16_t> u16s;
-    for (size_t c = 2; c < entry_count && u16s.length() <= namelen; ++c) {
-        if (n[c].type == exfat::FILE_NAME) {
-            for (size_t i = 0; i < exfat::file_name_entry_t::FS_FILE_NAME_ENTRY_SIZE && u16s.length() <= namelen; ++i) {
-                u16s.push_back((char16_t)n[c].name[i]);
-            }
+    for(uint32_t i=0;i<256;i++) {
+        uint32_t ch=i;
+        uint32_t crc=0;
+        for(size_t j=0;j<8;j++) {
+            uint32_t b=(ch^crc)&1;
+            crc>>=1;
+            if(b) crc=crc^0xEDB88320;
+            ch>>=1;
         }
+        _table[i]=crc;
     }
-    return cvt.to_bytes(u16s);
+}
+
+uint32_t crc32::compute(const char *s,size_t n) {
+    uint32_t crc=0xFFFFFFFF;
+
+    for(size_t i=0;i<n;i++) {
+        char ch=s[i];
+        uint32_t t=(ch^crc)&0xFF;
+        crc=(crc>>8)^_table[t];
+    }
+
+    return ~crc;
 }

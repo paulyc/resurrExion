@@ -1,8 +1,8 @@
 //
-//  quick.cpp
+//  filetype.hpp
 //  resurrExion
 //
-//  Created by Paul Ciarlo on 14 July 2020
+//  Created by Paul Ciarlo on 27 July 2019
 //
 //  Copyright (C) 2020 Paul Ciarlo <paul.ciarlo@gmail.com>
 //
@@ -25,21 +25,27 @@
 //  SOFTWARE.
 //
 
-#include "quick.hpp"
+#ifndef RESURREX_FILETYPE_HPP
+#define RESURREX_FILETYPE_HPP
 
-std::string get_utf8_filename(exfat::file_directory_entry_t *fde, struct exfat::stream_extension_entry_t *sde)
+#include <stdint.h>
+#include <stddef.h>
+#include <codecvt>
+#include <locale>
+
+class filetype
 {
-    const size_t entry_count = fde->continuations + 1;
-    // i dont know that this means anything without decoding the string because UTF-16 is so dumb re: the "emoji problem"
-    const size_t namelen = sde->name_length;
-    struct exfat::file_name_entry_t *n = reinterpret_cast<struct exfat::file_name_entry_t*>(fde);
-    std::basic_string<char16_t> u16s;
-    for (size_t c = 2; c < entry_count && u16s.length() <= namelen; ++c) {
-        if (n[c].type == exfat::FILE_NAME) {
-            for (size_t i = 0; i < exfat::file_name_entry_t::FS_FILE_NAME_ENTRY_SIZE && u16s.length() <= namelen; ++i) {
-                u16s.push_back((char16_t)n[c].name[i]);
-            }
-        }
-    }
-    return cvt.to_bytes(u16s);
-}
+public:
+    enum Type { flac, aiff, wave, mp4, aac, mp3,
+                jpg, avi, mov, mkv, text, tif, gif, png,
+                html, s3d, dds, eqg, ogg, ams, asg, adg, exe,
+                torrent, obj, elf, unknown };
+    filetype();
+    ~filetype() {}
+    Type identify_cluster(const char *data, size_t len);
+private:
+    //std::wstring_convert<std::codecvt<char16_t, char, std::mbstate_t>> _conv16;
+    //std::wstring_convert<std::codecvt<char32_t, char, std::mbstate_t>> _conv32;
+};
+
+#endif // RESURREX_FILETYPE_HPP
