@@ -37,7 +37,7 @@ public:
 
     ~FilesystemStub();
 
-    void open(std::string devpath);
+    void open(const std::string &devpath);
 
     void close();
 

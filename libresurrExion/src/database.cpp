@@ -29,7 +29,7 @@
 #include <unordered_set>
 
 // "root", "root", "resurrex", 0, "/run/mysqld/mysqld.sock"
-Database::Database(const std::string &user, const std::string &pass, const std::string &sock, const std::string &db) {
+Database::Database(const std::string &dev, const std::string &user, const std::string &pass, const std::string &sock, const std::string &db) {
     sql::Driver* driver= sql::mariadb::get_driver_instance();
     sql::SQLString url("jdbc:mariadb://localhost:3306/" + db);
     sql::Properties props({{"user", user}, {"password", pass}});
@@ -38,16 +38,16 @@ Database::Database(const std::string &user, const std::string &pass, const std::
     //mariadb::account_ref a = mariadb::account::create("", user.c_str(), pass.c_str(), db.c_str(), 0, sock.c_str());
     //a->set_auto_commit(true);
     //_conn = mariadb::connection::create(a);
+    _stub.open(dev);
 }
 Database::~Database() {
     _conn->close();
     _conn = nullptr;
+    _stub.close();
 }
 
 void Database::rescue_music() {
     //dir = "/home/paulyc/elements";
-    FilesystemStub stub;
-    stub.open("/dev/sdb");
     sql::PreparedStatement *stmt = _conn->prepareStatement("update file set is_copied_off = 1 where file.entity_offset = ?");
     std::function<void(File*)> onFileCopied = [&stmt](File *f){
         stmt->setUInt64(0, f->_offset);
@@ -59,12 +59,12 @@ void Database::rescue_music() {
     while (rs->next()) {
         //mariadb::transaction_ref txref = _conn->create_transaction();
         mariadb::u64 pdo = rs->getUInt64(0);
-        Directory * d = reinterpret_cast<Directory*>(stub.loadEntityOffset(pdo, "temp"));
+        Directory * d = reinterpret_cast<Directory*>(_stub.loadEntityOffset(pdo, "temp"));
         if (d == nullptr) {
             continue;
         }
         std::string name = std::string(d->_name.c_str());
-        stub.dump_directory(d, name, onFileCopied, false);
+        _stub.dump_directory(d, name, onFileCopied, false);
         //txref->commit();
     }
 
@@ -72,10 +72,7 @@ void Database::rescue_music() {
     stmt->close();
 }
 
-void Database::rescue_orphan_dirs(const char *dev) {
-    FilesystemStub stub;
-    stub.open(dev);
-
+void Database::rescue_orphan_dirs() {
     sql::PreparedStatement *stmt = _conn->prepareStatement("update file set is_copied_off = 1 where file.entry_offset = ?");
     sql::PreparedStatement *frag_stmt = _conn->prepareStatement("update file set is_contiguous = ? where file.entry_offset = ?");
     sql::PreparedStatement *dir_stmt = _conn->prepareStatement("select entry_offset, parent_directory_offset from directory where entry_offset = ?");
@@ -101,11 +98,11 @@ void Database::rescue_orphan_dirs(const char *dev) {
 
     while (orphan_dirs->next()) {
         mariadb::u64 pdo = orphan_dirs->getUInt64(0);
-        Directory * d = reinterpret_cast<Directory*>(stub.loadEntityOffset(pdo, "temp"));
+        Directory * d = reinterpret_cast<Directory*>(_stub.loadEntityOffset(pdo, "temp"));
         if (d == nullptr) {
             std::cerr << "failed to load directory pdo = " << pdo << std::endl;
         }
-        stub.dump_directory(d, std::string(d->_name.c_str()), onFileCopied, false);
+        _stub.dump_directory(d, std::string(d->_name.c_str()), onFileCopied, false);
         delete d;
     }
     orphan_dirs->close();
@@ -122,10 +119,7 @@ static void copy_files(std::list<File*> &files, uint8_t *mmap, const char *dir) 
     }
 }
 
-void Database::rescue_dupe_orphan_files(const char *dev, const char *dir) {
-    FilesystemStub stub;
-    stub.open(dev);
-
+void Database::rescue_dupe_orphan_files(const char *dir) {
     sql::Statement *s = _conn->createStatement();
     sql::ResultSet *orphan_files = s->executeQuery(
                 "select count(*) c, name from file where parent_directory_offset = 0 group by name order by c asc");
@@ -139,7 +133,7 @@ void Database::rescue_dupe_orphan_files(const char *dev, const char *dir) {
             std::list<File*> files;
             while (dupes->next()) {
                 mariadb::u64 pdo = dupes->getUInt64(0);
-                File * f = reinterpret_cast<File*>(stub.loadEntityOffset(pdo, "temp"));
+                File * f = reinterpret_cast<File*>(_stub.loadEntityOffset(pdo, "temp"));
                 if (f == nullptr) {
                     std::cerr << "failed to load file pdo = " << pdo << std::endl;
                 }
@@ -155,7 +149,7 @@ void Database::rescue_dupe_orphan_files(const char *dev, const char *dir) {
                 uint32_t c = (*it)->_data_length;
                 if (c != crc) {
                     std::cout << "no match len " << crc << " and " << c << std::endl;
-                    copy_files(files, stub._mmap, dir);
+                    copy_files(files, _stub._mmap, dir);
                     break;
                 }
             }
@@ -169,10 +163,7 @@ void Database::rescue_dupe_orphan_files(const char *dev, const char *dir) {
     s->close();
 }
 
-void Database::rescue_orphan_files(const char *dev, const char *dir) {
-    FilesystemStub stub;
-    stub.open(dev);
-
+void Database::rescue_orphan_files(const char *dir) {
     sql::Statement *s = _conn->createStatement();
     sql::PreparedStatement *stmt = _conn->prepareStatement(
                 "update file set is_copied_off = 1 where file.entry_offset = ?");
@@ -191,11 +182,11 @@ void Database::rescue_orphan_files(const char *dev, const char *dir) {
 
     while (orphan_files->next()) {
         mariadb::u64 pdo = orphan_files->getUInt64(0);
-        File * f = reinterpret_cast<File*>(stub.loadEntityOffset(pdo, "temp"));
+        File * f = reinterpret_cast<File*>(_stub.loadEntityOffset(pdo, "temp"));
         if (f == nullptr) {
             std::cerr << "failed to load file pdo = " << pdo << std::endl;
         }
-        f->copy_to_dir(stub._mmap, dir);
+        f->copy_to_dir(_stub._mmap, dir);
         onFileCopied(f);
         std::cout << "wrote " << f->_offset << std::endl;
        // stub.dump_directory(d, std::string(d->_name.c_str()), onFileCopied, false);
@@ -205,6 +196,10 @@ void Database::rescue_orphan_files(const char *dev, const char *dir) {
     dir_stmt->close();
     stmt->close();
     s->close();
+}
+
+void Database::fill_allocated_clusters() {
+
 }
 
 /*
