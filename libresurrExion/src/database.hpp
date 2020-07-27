@@ -85,7 +85,6 @@ struct File
 -- -----------------------------------------------------
 CREATE TABLE IF NOT EXISTS `cluster` (
   `id` BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
-  `cluster` BIGINT(20) UNSIGNED NOT NULL,
   `allocated` TINYINT(1) NULL,
   `type` VARCHAR(255) NULL,
   `next` BIGINT(20) UNSIGNED NULL,
@@ -125,6 +124,7 @@ public:
     void rescue_orphan_files(const char *dir);
     void rescue_dupe_orphan_files(const char *dir);
     void fill_allocated_clusters();
+    void init_cluster_table();
 //private:
     sql::Connection *_conn;
     FilesystemStub _stub;

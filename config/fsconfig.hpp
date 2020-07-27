@@ -48,10 +48,13 @@
 
 constexpr static size_t SectorSize = 512;
 constexpr static size_t SectorsPerCluster = 512;
+constexpr static size_t ClusterSize = SectorSize*SectorsPerCluster;
 constexpr static sectorofs_t NumSectors = 7813560247;
 constexpr static clusterofs_t ClustersInFat = (NumSectors - 0x283D8) / 512;
 constexpr static sectorofs_t PartitionStartSector = 0x64028;
 constexpr static sectorofs_t ClusterHeapStartSector = 0x283D8; // relative to partition start
+constexpr static size_t ClusterHeapStartSectorRelWholeDisk = PartitionStartSector + ClusterHeapStartSector;
+constexpr static size_t ClusterHeapStartOffset = ClusterHeapStartSectorRelWholeDisk * SectorSize;
 constexpr static byteofs_t DiskSize = (NumSectors + PartitionStartSector) * SectorSize;
 
 #endif /* _github_paulyc_exfat_fsconfig_hpp_ */

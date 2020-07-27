@@ -50,6 +50,8 @@ add_library(resurrExion SHARED
     crc32.hpp
     postgres.cpp
     postgres.hpp
+    filetype.cpp
+    filetype.hpp
 )
 
 #set_source_files_properties(${LIB_HEADERS} PROPERTIES HEADER_FILE_ONLY TRUE)

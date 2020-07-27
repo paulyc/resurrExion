@@ -1,8 +1,8 @@
 //
-//  postgres.hpp
+//  filetype.cpp
 //  resurrExion
 //
-//  Created by Paul Ciarlo on 26 July 2019
+//  Created by Paul Ciarlo on 27 July 2019
 //
 //  Copyright (C) 2020 Paul Ciarlo <paul.ciarlo@gmail.com>
 //
@@ -25,13 +25,26 @@
 //  SOFTWARE.
 //
 
-#ifndef RESURREX_POSTGRES_HPP
-#define RESURREX_POSTGRES_HPP
+#include "filetype.hpp"
 
-class postgres
+filetype::filetype()
 {
-public:
-    postgres();
-};
 
-#endif // RESURREX_POSTGRES_HPP
+}
+
+
+filetype::Type filetype::identify_cluster(const char *data, size_t len) {
+    int ascii_chars = 0;
+    int utf8_chars = 0;
+    int utf16_chars = 0;
+    int16_t s16sum = 0;
+   // _conv16.from_bytes(data, data+len);
+    static constexpr uint32_t flac_stream = 'CaLf'; //'fLaC';
+    static constexpr uint16_t flac_frame_hdr = 0xFFF8;//0b1111111111111000;
+
+    for (size_t i = 0; i < len; ++i) {
+        if ((data[i] & 1) == 0) {
+            s16sum += *(int16_t*)&data[i];
+        }
+    }
+}
