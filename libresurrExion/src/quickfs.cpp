@@ -39,7 +39,7 @@ FilesystemStub::FilesystemStub():
     }
 }
 
-void FilesystemStub::open(std::string devpath) {
+void FilesystemStub::open(const std::string &devpath) {
     //const bool write_changes = false;
     //const int oflags = write_changes ? O_RDWR | O_DSYNC | O_RSYNC : O_RDONLY;
     _fd = ::open(devpath.c_str(), O_RDONLY | O_DSYNC | O_RSYNC);
