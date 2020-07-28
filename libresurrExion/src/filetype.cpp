@@ -47,4 +47,5 @@ filetype::Type filetype::identify_cluster(const char *data, size_t len) {
             s16sum += *(int16_t*)&data[i];
         }
     }
+    return unknown;
 }

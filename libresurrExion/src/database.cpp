@@ -27,6 +27,7 @@
 
 #include "database.hpp"
 #include <unordered_set>
+#include <sstream>
 
 // "root", "root", "resurrex", 0, "/run/mysqld/mysqld.sock"
 Database::Database(const std::string &dev, const std::string &user, const std::string &pass, const std::string &sock, const std::string &db) {
@@ -35,10 +36,9 @@ Database::Database(const std::string &dev, const std::string &user, const std::s
     sql::Properties props({{"user", user}, {"password", pass}});
     _conn = driver->connect(url, props);
     _conn->setAutoCommit(true);
-    //mariadb::account_ref a = mariadb::account::create("", user.c_str(), pass.c_str(), db.c_str(), 0, sock.c_str());
-    //a->set_auto_commit(true);
-    //_conn = mariadb::connection::create(a);
-    _stub.open(dev);
+    if (dev != "") {
+        _stub.open(dev);
+    }
 }
 Database::~Database() {
     _conn->close();
@@ -50,7 +50,7 @@ void Database::rescue_music() {
     //dir = "/home/paulyc/elements";
     sql::PreparedStatement *stmt = _conn->prepareStatement("update file set is_copied_off = 1 where file.entity_offset = ?");
     std::function<void(File*)> onFileCopied = [&stmt](File *f){
-        stmt->setUInt64(0, f->_offset);
+        stmt->setUInt64(1, f->_offset);
         stmt->executeUpdate();
     };
     //stub.parseTextLog("recovery.log");
@@ -58,7 +58,7 @@ void Database::rescue_music() {
     sql::ResultSet *rs = s->executeQuery("select distinct(parent_directory_offset) from file where name like '%flac' or name like '%mp3' or name like '%wav' or name like '%m4a' or name like '%aiff' or name like '%aif'");
     while (rs->next()) {
         //mariadb::transaction_ref txref = _conn->create_transaction();
-        mariadb::u64 pdo = rs->getUInt64(0);
+        uint64_t pdo = rs->getUInt64(1);
         Directory * d = reinterpret_cast<Directory*>(_stub.loadEntityOffset(pdo, "temp"));
         if (d == nullptr) {
             continue;
@@ -78,7 +78,7 @@ void Database::rescue_orphan_dirs() {
     sql::PreparedStatement *dir_stmt = _conn->prepareStatement("select entry_offset, parent_directory_offset from directory where entry_offset = ?");
     uint64_t count = 0;
     std::function<void(File*)> onFileCopied = [&stmt, &frag_stmt, &count](File *f){
-        stmt->setUInt64(0, f->_offset);
+        stmt->setUInt64(1, f->_offset);
         stmt->executeUpdate();
         //frag_stmt->set_unsigned8(0, f->_contiguous);
         //frag_stmt->set_unsigned64(1, f->_offset);
@@ -97,7 +97,7 @@ void Database::rescue_orphan_dirs() {
                 );
 
     while (orphan_dirs->next()) {
-        mariadb::u64 pdo = orphan_dirs->getUInt64(0);
+        byteofs_t pdo = orphan_dirs->getUInt64("entry_offset");
         Directory * d = reinterpret_cast<Directory*>(_stub.loadEntityOffset(pdo, "temp"));
         if (d == nullptr) {
             std::cerr << "failed to load directory pdo = " << pdo << std::endl;
@@ -125,14 +125,14 @@ void Database::rescue_dupe_orphan_files(const char *dir) {
                 "select count(*) c, name from file where parent_directory_offset = 0 group by name order by c asc");
     sql::PreparedStatement *dupes_stmt = _conn->prepareStatement("select entry_offset from file where name = ?");
     while (orphan_files->next()) {
-        mariadb::u64 count = orphan_files->getUInt64(0);
+        uint64_t count = orphan_files->getUInt64("c");
         if (count > 1) {
-            sql::SQLString name = orphan_files->getString(1);
-            dupes_stmt->setString(0, name);
+            sql::SQLString name = orphan_files->getString("name");
+            dupes_stmt->setString(1, name);
             sql::ResultSet *dupes = dupes_stmt->executeQuery();
             std::list<File*> files;
             while (dupes->next()) {
-                mariadb::u64 pdo = dupes->getUInt64(0);
+                byteofs_t pdo = dupes->getUInt64("entry_offset");
                 File * f = reinterpret_cast<File*>(_stub.loadEntityOffset(pdo, "temp"));
                 if (f == nullptr) {
                     std::cerr << "failed to load file pdo = " << pdo << std::endl;
@@ -171,7 +171,7 @@ void Database::rescue_orphan_files(const char *dir) {
                 "select entry_offset, parent_directory_offset from directory where entry_offset = ?");
     uint64_t count = 0;
     std::function<void(File*)> onFileCopied = [&stmt, &count](File *f){
-        stmt->setUInt64(0, f->_offset);
+        stmt->setUInt64(1, f->_offset);
         stmt->executeUpdate();
         if (++count % 1000 == 0) {
             std::cout << "counted " << count << std::endl;
@@ -181,7 +181,7 @@ void Database::rescue_orphan_files(const char *dir) {
                 "select entry_offset from file where is_contiguous = 1 and is_copied_off = 0 and entry_offset > 237329123584 order by entry_offset asc ");
 
     while (orphan_files->next()) {
-        mariadb::u64 pdo = orphan_files->getUInt64(0);
+        byteofs_t pdo = orphan_files->getUInt64("entry_offset");
         File * f = reinterpret_cast<File*>(_stub.loadEntityOffset(pdo, "temp"));
         if (f == nullptr) {
             std::cerr << "failed to load file pdo = " << pdo << std::endl;
@@ -201,12 +201,15 @@ void Database::rescue_orphan_files(const char *dir) {
 static constexpr clusterofs_t NumClusters = 15260537;
 
 void Database::fill_allocated_clusters() {
+
     sql::Statement *s = _conn->createStatement();
-    sql::PreparedStatement *ps = _conn->prepareStatement("insert into cluster(cluster, allocated, file) values(?, ?, ?)");
+    //sql::PreparedStatement *ps = _conn->prepareStatement("insert into cluster(cluster, allocated, file) values(?, ?, ?)");
     sql::ResultSet *rs = s->executeQuery(
-                "select entry_offset, name, data_offset, data_len, is_contiguous from file order by entry_offset asc"
+                "select entry_offset, name, data_offset, data_len, is_contiguous from file where entry_offset >= 2562102657504 order by entry_offset asc"
                 );
     while (rs->next()) {
+        std::ostringstream q;
+        q << "insert into cluster(cluster, allocated, file) values ";
         byteofs_t entry_offset = rs->getUInt64("entry_offset");
         sql::SQLString name = rs->getString("name");
         byteofs_t data_offset = rs->getUInt64("data_offset");
@@ -214,17 +217,25 @@ void Database::fill_allocated_clusters() {
         int is_contiguous = rs->getInt("is_contiguous");
         clusterofs_t c = (data_offset - ClusterHeapStartOffset) / ClusterSize;
         do {
-            ps->setUInt64(1, c);
+            /*ps->setUInt64(1, c);
             ps->setInt(2, 1);
             ps->setUInt64(3, entry_offset);
-            ps->execute();
+            ps->execute();*/
             data_len -= ClusterSize;
             ++c;
-            std::cout << "insert into cluster(cluster, allocated, file) values(" << c << ", 1, " << entry_offset << ")" << std::endl;
-        } while (is_contiguous && data_len > 0);
+            q << '(' << c << ",1," << entry_offset << ')';
+            //std::cout << "insert into cluster(cluster, allocated, file) values(" << c << ", 1, " << entry_offset << ")" << std::endl;
+            if (is_contiguous && data_len > 0) {
+                q << ',';
+            } else {
+                break;
+            }
+        } while (1);
+        s->executeQuery(q.str());
+        std::cout << q.str() << std::endl;
     }
     rs->close();
-    ps->close();
+    //ps->close();
     s->close();
 }
 

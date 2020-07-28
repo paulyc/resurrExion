@@ -40,8 +40,6 @@ add_library(resurrExion SHARED
     types.cpp
     database.cpp
     database.hpp
-    quick.hpp
-    quick.cpp
     quickentity.cpp
     quickentity.hpp
     quickfs.cpp

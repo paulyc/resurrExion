@@ -28,7 +28,7 @@
 #ifndef RESURREX_QUICKFS_HPP
 #define RESURREX_QUICKFS_HPP
 
-#include "quick.hpp"
+#include "quickentity.hpp"
 
 class FilesystemStub
 {

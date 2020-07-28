@@ -33,7 +33,7 @@
 
 #include <mariadbcpp/ConnCpp.h>
 
-#include "quick.hpp"
+#include "quickfs.hpp"
 
 namespace model {
 
