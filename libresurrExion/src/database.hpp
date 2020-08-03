@@ -125,6 +125,7 @@ public:
     void rescue_dupe_orphan_files(const char *dir);
     void fill_allocated_clusters();
     void init_cluster_table();
+    void consolidate_unaccounted_clusters();
 //private:
     sql::Connection *_conn;
     FilesystemStub _stub;

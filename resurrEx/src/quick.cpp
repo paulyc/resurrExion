@@ -29,8 +29,7 @@
 
 int main(int argc, char *argv[]) {
     Database d("", "root", "root", "/run/mysqld/mysqld.sock", "resurrex");
-    d.fill_allocated_clusters();
-    //d.rescue_dupe_orphan_files("/barracuda/rescuefiles/files/dupes");
+    d.consolidate_unaccounted_clusters();
     return 0;
 }
 

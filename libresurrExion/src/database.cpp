@@ -253,11 +253,18 @@ void Database::init_cluster_table() {
     s->executeQuery("alter table cluster enable keys");
 }
 
-/*
-void Database::migrate_to_sql_ids() {
-    mariadb::result_set_ref rs = _conn->query("SELECT id, parent_directory_offset FROM file");
-    while (rs->next()) {
+// checks every cluster sequentially, if it is not accounted for by a file that was already saved,
+// thereby being flagged in the db as copied off, move it to the first accounted for cluster,
+// that has not already been copied to
+void Database::consolidate_unaccounted_clusters() {
+    // im just going to start using the C connector now,
+    // cause the mariadb C++ connector is both braindead and entirely undocumented
 
-    }
+    // even though the databases themselves tend to be written in C++, it is totally treated as the
+    // bastard child of client languages that no one cares about, every single DB driver I've used
+    // in node is vastly more powerful and easier to use than anything available for C++
+
+    // I basically write any database heavy app in node now.. and that can just as easily go for IO
+    // in general moral of the story don't use C++ except for CPU bound desktop apps, which are not
+    // going to exist at all for much longer in my estimation
 }
-*/
