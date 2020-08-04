@@ -49,3 +49,4 @@ orphan.log*
 .vscode
 *.code-workspace
 .idea/
+node_modules/

@@ -1,0 +1,22 @@
+{
+  "name": "resurrexion",
+  "version": "1.0.0",
+  "description": "Tool for restoring your ExFAT files and filesystem when you accidentally format the wrong disk.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/paulyc/resurrExion.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/paulyc/resurrExion/issues"
+  },
+  "homepage": "https://github.com/paulyc/resurrExion#readme",
+  "dependencies": {
+    "mariadb": "^2.4.2"
+  }
+}
