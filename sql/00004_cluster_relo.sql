@@ -10,3 +10,5 @@ ALTER TABLE `cluster`
     REFERENCES `cluster` (`cluster`)
   ON DELETE RESTRICT
   ON UPDATE RESTRICT;
+
+ALTER TABLE `cluster` ADD KEY `cluster_allocated_indx`(`allocated`);
