@@ -50,8 +50,10 @@ add_library(resurrExion SHARED
     postgres.hpp
     filetype.cpp
     filetype.hpp
+    rescue.cpp
+    rescue.hpp
 )
 
 #set_source_files_properties(${LIB_HEADERS} PROPERTIES HEADER_FILE_ONLY TRUE)
 target_include_directories(resurrExion PUBLIC /usr/include/mysql)
-target_link_libraries(resurrExion -lmariadb -lmariadbcpp -lmysqlclient)
+target_link_libraries(resurrExion -lmariadb /usr/local/lib/mariadb/libmariadbcpp.so -lmysqlclient)

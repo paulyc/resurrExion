@@ -22,9 +22,9 @@
 # SOFTWARE.
 #
 
-add_executable(resurrEx main.cpp quick.cpp)
+add_executable(resurrEx main.cpp)
 target_include_directories(resurrEx PUBLIC ${Boost_INCLUDE_DIRS} ../../config ../../libresurrExion/src)
-target_link_libraries(resurrEx resurrExion ${Boost_LIBRARIES} -lmariadb -lmariadbcpp -lmysqlclient)
+target_link_libraries(resurrEx resurrExion ${Boost_LIBRARIES} -lmariadb /usr/local/lib/mariadb/libmariadbcpp.so -lmysqlclient)
 
 #add_executable(quick quick.cpp)
 #target_include_directories(quick PUBLIC ${Boost_INCLUDE_DIRS} ../../config ../../libresurrExion/src)

@@ -118,11 +118,7 @@ class Database
 public:
     Database(const std::string &dev, const std::string &user, const std::string &pass, const std::string &sock, const std::string &db);
     ~Database();
-    //void migrate_to_sql_ids();
-    void rescue_music();
-    void rescue_orphan_dirs();
-    void rescue_orphan_files(const char *dir);
-    void rescue_dupe_orphan_files(const char *dir);
+
     void fill_allocated_clusters();
     void init_cluster_table();
     void consolidate_unaccounted_clusters();
