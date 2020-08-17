@@ -30,20 +30,16 @@
 #include <sstream>
 
 // "root", "root", "resurrex", 0, "/run/mysqld/mysqld.sock"
-Database::Database(const std::string &dev, const std::string &user, const std::string &pass, const std::string &sock, const std::string &db) {
+Database::Database(const std::string &user, const std::string &pass, const std::string &sock, const std::string &db) {
     sql::Driver* driver= sql::mariadb::get_driver_instance();
     sql::SQLString url("jdbc:mariadb://localhost:3306/" + db);
     sql::Properties props({{"user", user}, {"password", pass}});
     _conn = driver->connect(url, props);
     _conn->setAutoCommit(true);
-    if (dev != "") {
-        _stub.open(dev);
-    }
 }
 Database::~Database() {
     _conn->close();
     _conn = nullptr;
-    _stub.close();
 }
 
 static constexpr clusterofs_t NumClusters = 15260537;

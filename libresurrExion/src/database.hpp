@@ -116,7 +116,7 @@ struct Cluster
 class Database
 {
 public:
-    Database(const std::string &dev, const std::string &user, const std::string &pass, const std::string &sock, const std::string &db);
+    Database(const std::string &user, const std::string &pass, const std::string &sock, const std::string &db);
     ~Database();
 
     void fill_allocated_clusters();

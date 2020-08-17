@@ -24,8 +24,19 @@
 //
 
 #include "rescue.hpp"
+#include "types.hpp"
 
-void github::paulyc::SalvatorDatorum::rescue_music(Database &db) {
+void github::paulyc::SalvatorDatorum::consolidate_fragments(FilesystemStub &fs, Database &db) {
+    sql::Statement *s = db._conn->createStatement();
+    sql::ResultSet *rs = s->executeQuery("SELECT r.from_cluster, r.to_cluster FROM relocate r ORDER BY r.from_cluster ASC");
+    while (rs->next()) {
+        clusterofs_t from = rs->getUInt64("from_cluster");
+        clusterofs_t to   = rs->getUInt64("to_cluster");
+    }
+    rs->close();
+}
+
+void github::paulyc::SalvatorDatorum::rescue_music(FilesystemStub &fs, Database &db) {
     //dir = "/home/paulyc/elements";
     sql::PreparedStatement *stmt = db._conn->prepareStatement("update file set is_copied_off = 1 where file.entity_offset = ?");
     std::function<void(File*)> onFileCopied = [&stmt](File *f){
@@ -38,12 +49,12 @@ void github::paulyc::SalvatorDatorum::rescue_music(Database &db) {
     while (rs->next()) {
         //mariadb::transaction_ref txref = db._conn->create_transaction();
         uint64_t pdo = rs->getUInt64(1);
-        Directory * d = reinterpret_cast<Directory*>(db._stub.loadEntityOffset(pdo, "temp"));
+        Directory * d = reinterpret_cast<Directory*>(fs.loadEntityOffset(pdo, "temp"));
         if (d == nullptr) {
             continue;
         }
         std::string name = std::string(d->_name.c_str());
-        db._stub.dump_directory(d, name, onFileCopied, false);
+        fs.dump_directory(d, name, onFileCopied, false);
         //txref->commit();
     }
 
@@ -51,7 +62,7 @@ void github::paulyc::SalvatorDatorum::rescue_music(Database &db) {
     stmt->close();
 }
 
-void github::paulyc::SalvatorDatorum::rescue_orphan_dirs(Database &db) {
+void github::paulyc::SalvatorDatorum::rescue_orphan_dirs(FilesystemStub &fs, Database &db) {
     sql::PreparedStatement *stmt = db._conn->prepareStatement("update file set is_copied_off = 1 where file.entry_offset = ?");
     sql::PreparedStatement *frag_stmt = db._conn->prepareStatement("update file set is_contiguous = ? where file.entry_offset = ?");
     sql::PreparedStatement *dir_stmt = db._conn->prepareStatement("select entry_offset, parent_directory_offset from directory where entry_offset = ?");
@@ -77,11 +88,11 @@ void github::paulyc::SalvatorDatorum::rescue_orphan_dirs(Database &db) {
 
     while (orphan_dirs->next()) {
         byteofs_t pdo = orphan_dirs->getUInt64("entry_offset");
-        Directory * d = reinterpret_cast<Directory*>(db._stub.loadEntityOffset(pdo, "temp"));
+        Directory * d = reinterpret_cast<Directory*>(fs.loadEntityOffset(pdo, "temp"));
         if (d == nullptr) {
             std::cerr << "failed to load directory pdo = " << pdo << std::endl;
         }
-        db._stub.dump_directory(d, std::string(d->_name.c_str()), onFileCopied, false);
+        fs.dump_directory(d, std::string(d->_name.c_str()), onFileCopied, false);
         delete d;
     }
     orphan_dirs->close();
@@ -98,7 +109,7 @@ static void copy_files(std::list<File*> &files, uint8_t *mmap, const char *dir) 
     }
 }
 
-void github::paulyc::SalvatorDatorum::rescue_dupe_orphan_files(Database &db, const char *dir) {
+void github::paulyc::SalvatorDatorum::rescue_dupe_orphan_files(FilesystemStub &fs, Database &db, const char *dir) {
     sql::Statement *s = db._conn->createStatement();
     sql::ResultSet *orphan_files = s->executeQuery(
                 "select count(*) c, name from file where parent_directory_offset = 0 group by name order by c asc");
@@ -112,7 +123,7 @@ void github::paulyc::SalvatorDatorum::rescue_dupe_orphan_files(Database &db, con
             std::list<File*> files;
             while (dupes->next()) {
                 byteofs_t pdo = dupes->getUInt64("entry_offset");
-                File * f = reinterpret_cast<File*>(db._stub.loadEntityOffset(pdo, "temp"));
+                File * f = reinterpret_cast<File*>(fs.loadEntityOffset(pdo, "temp"));
                 if (f == nullptr) {
                     std::cerr << "failed to load file pdo = " << pdo << std::endl;
                 }
@@ -128,7 +139,7 @@ void github::paulyc::SalvatorDatorum::rescue_dupe_orphan_files(Database &db, con
                 uint32_t c = (*it)->_data_length;
                 if (c != crc) {
                     std::cout << "no match len " << crc << " and " << c << std::endl;
-                    copy_files(files, db._stub._mmap, dir);
+                    copy_files(files, fs._mmap, dir);
                     break;
                 }
             }
@@ -142,7 +153,7 @@ void github::paulyc::SalvatorDatorum::rescue_dupe_orphan_files(Database &db, con
     s->close();
 }
 
-void github::paulyc::SalvatorDatorum::rescue_orphan_files(Database &db, const char *dir) {
+void github::paulyc::SalvatorDatorum::rescue_orphan_files(FilesystemStub &fs, Database &db, const char *dir) {
     sql::Statement *s = db._conn->createStatement();
     sql::PreparedStatement *stmt = db._conn->prepareStatement(
                 "update file set is_copied_off = 1 where file.entry_offset = ?");
@@ -161,11 +172,11 @@ void github::paulyc::SalvatorDatorum::rescue_orphan_files(Database &db, const ch
 
     while (orphan_files->next()) {
         byteofs_t pdo = orphan_files->getUInt64("entry_offset");
-        File * f = reinterpret_cast<File*>(db._stub.loadEntityOffset(pdo, "temp"));
+        File * f = reinterpret_cast<File*>(fs.loadEntityOffset(pdo, "temp"));
         if (f == nullptr) {
             std::cerr << "failed to load file pdo = " << pdo << std::endl;
         }
-        f->copy_to_dir(db._stub._mmap, dir);
+        f->copy_to_dir(fs._mmap, dir);
         onFileCopied(f);
         std::cout << "wrote " << f->_offset << std::endl;
        // stub.dump_directory(d, std::string(d->_name.c_str()), onFileCopied, false);

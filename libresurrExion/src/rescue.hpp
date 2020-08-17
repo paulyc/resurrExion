@@ -34,10 +34,11 @@ namespace paulyc {
 class SalvatorDatorum
 {
 public:
-    void rescue_music(Database &db);
-    void rescue_orphan_dirs(Database &db);
-    void rescue_orphan_files(Database &db, const char *dir);
-    void rescue_dupe_orphan_files(Database &db, const char *dir);
+    void rescue_music(FilesystemStub &fs, Database &db);
+    void rescue_orphan_dirs(FilesystemStub &fs, Database &db);
+    void rescue_orphan_files(FilesystemStub &fs, Database &db, const char *dir);
+    void rescue_dupe_orphan_files(FilesystemStub &fs, Database &db, const char *dir);
+    void consolidate_fragments(FilesystemStub &fs, Database &db);
 };
 
 }
