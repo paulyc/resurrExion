@@ -34,18 +34,19 @@ function ClusterSequence(start, end, allocated) {
 }
 
 function ClusterRecord(){
-  //  this.clusterSequences = [new ClusterSequence(0,20,1)];
 }
+
 ClusterRecord.prototype = {
-    _nextClusterQuery: 'select id, cluster, allocated, file from cluster where cluster > ? group by cluster order by cluster asc limit 1',
-    _allClustersQuery: 'select id, cluster, allocated, file from cluster group by cluster order by cluster asc',
-    _freeClustersQuery: 'select * from cluster where cluster > ? and allocated = 1 order by cluster asc limit 10',
+    _nextClusterQuery: 'select id, cluster, allocated from cluster where cluster > ? group by cluster order by cluster asc limit 1',
+    _allClustersQuery: 'select id, cluster, allocated from cluster group by cluster order by cluster asc',
+    _freeClustersQuery: 'select cluster, allocated from cluster where cluster > ? and allocated = 1 order by cluster asc limit 10',
     _insertFreeClustersQuery: 'insert into cluster(cluster,allocated) values(?,?)',
     _allUnallocatedQuery: "SELECT cluster from cluster WHERE allocated = 1 AND consolidated_cluster IS NULL order by cluster asc",
+    _funJoinQuery: 'SELECT c1.cluster c FROM cluster c1 LEFT OUTER JOIN cluster c2 ON c1.cluster = c2.consolidated_cluster WHERE c1.cluster > ? AND c1.allocated = 1 AND c2.consolidated_cluster IS NULL GROUP BY c1.cluster ORDER BY c1.cluster ASC LIMIT 1',
     constructor: ClusterRecord,
     fillInMissing: async function (conn) {
         let params = [];
-        for (let cluster = 14901939; cluster <= 15260538; ++cluster) {
+        for (let cluster = 20; cluster <= 15260538; ++cluster) {
             params.push([cluster,0]);
             if (params.length > 1024) {
                 await conn.batch(this._insertFreeClustersQuery, params);
@@ -81,13 +82,6 @@ ClusterRecord.prototype = {
         const res = await conn.query(this._allUnallocatedQuery);
         return res.cluster;
     },
-    moveClustersInDb: async function (conn, row, empty_cluster) {
-        try {
-            await conn.startTransaction();
-            console.log('UPDATE cluster SET consolidated_cluster = ? where id = ?', [empty_cluster, row.id]);
-            await conn.commit();
-        } catch (ex) {}
-    },
     fill: async function (conn) {
         let offset = 0;
         const clusters = [];
@@ -102,62 +96,46 @@ ClusterRecord.prototype = {
 
         return clusters;
     },
-    moveCluster: async function (conn, from_ofs, to_ofs) {
-        //await conn.beginTransaction();
-        await conn.query('UPDATE cluster SET consolidated_cluster = ? where cluster = ?', [to_ofs, from_ofs]);
-       // await conn.query('UPDATE cluster SET consolidated_cluster = 0 WHERE cluster = ?', [to_ofs]);
-        //await conn.commit();
-    },
-    moveAll: async function (conn) {
-        const clusters = await this.fill(conn);
-        let free_ofs = 20;
-        while (clusters[free_ofs].allocated !== 0) {
-            ++ free_ofs;
-        }
-        let want_copy_ofs = free_ofs;
-        while (want_copy_ofs < clusters.length) {
-            while (clusters[want_copy_ofs] !== 1) {
-                ++ want_copy_ofs;
-            }
-            this.moveCluster(conn, want_copy_ofs-1, free_ofs++);
-            while (clusters[free_ofs] !== 0) {
-                ++ free_ofs;
-            }
-        }
-    },
-    move2: async function (conn) {
-        let free = 20;
-        let need = 0;
-        let res;
-        for (;;) {
-            res = await conn.query(
-                'SELECT c1.cluster c FROM cluster c1 '+
-                'LEFT OUTER JOIN cluster c2 '+
-                  'ON c1.cluster = c2.consolidated_cluster '+
-                'WHERE c1.allocated = 1 AND c2.consolidated_cluster IS NULL ' +
-                'GROUP BY c1.cluster ORDER BY c1.cluster ASC LIMIT 1'
-            );
-            free = res[0].c;
-
-            res = await conn.query(
-                'select cluster from cluster where cluster > ? and allocated = 0 and consolidated_cluster is null order by cluster asc limit 1',
-                [free]
-            );
-            need = res[0].cluster;
-            await this.moveCluster(conn, need, free);
-        }
-    },
 };
 
 async function main() {
-    const record = new ClusterRecord();
     const conn = await mariadb.createConnection('jdbc:mariadb://root:root@localhost/resurrex');
+    //const record = new ClusterRecord();
     //conn.setAutoCommit(false);
     //await record.buildFromDb(conn);
     //await record.fillInMissing(conn);
-    await record.move2(conn);
-    //record.setConsolidatedClusterRefs(conn);
-    conn.close();
+
+    const rows = await conn.query('SELECT c.cluster, c.allocated FROM cluster c GROUP BY c.cluster ORDER BY c.cluster ASC');
+    let to_i = 0;
+    let from_i = 0;
+    while (rows[to_i].cluster < 116) {
+        ++to_i;
+    }
+    while (rows[from_i].cluster < 426555) {
+        ++from_i;
+    }
+    //let batches = []; // [[1,2],[3,4]]
+    while (from_i < rows.length) {
+        let to = rows[to_i].cluster;
+        let from = rows[from_i].cluster;
+
+        const batch = [from, to];
+        //batches.push(batch);
+        const sql = 'INSERT INTO relocate(from_cluster, to_cluster) values (?,?)';
+        console.log(sql, batch);
+        await conn.query(sql, batch);
+        ++from_i;
+        while (rows[from_i].allocated !== 0) {
+            ++from_i;
+        }
+        ++to_i;
+        while (rows[to_i].allocated !== 1) {
+            ++to_i;
+        }
+    }
+    //await conn.batch('INSERT INTO relocate(from_cluster, to_cluster) values (?,?)', batches);
+
+	conn.close();
 }
 
 main()
