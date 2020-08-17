@@ -26,15 +26,26 @@
 #include "rescue.hpp"
 #include "types.hpp"
 
+typedef exfat::cluster_heap_t<SectorSize, SectorsPerCluster, ClustersInFat> cluster_heap;
+
 void github::paulyc::SalvatorDatorum::consolidate_fragments(FilesystemStub &fs, Database &db) {
+    cluster_heap *heap = (cluster_heap*) (fs._mmap + ClusterHeapStartOffset);
     sql::Connection *conn = db.getConnection();
+    sql::Connection *updateConn = db.getConnection();
     sql::Statement *s = conn->createStatement();
-    sql::ResultSet *rs = s->executeQuery("SELECT r.from_cluster, r.to_cluster FROM relocate r ORDER BY r.from_cluster ASC");
+    sql::ResultSet *rs = s->executeQuery("SELECT r.id, r.from_cluster, r.to_cluster FROM relocate r WHERE r.status = 0 ORDER BY r.from_cluster ASC");
+    sql::PreparedStatement *ps = updateConn->prepareStatement("UPDATE relocate SET status = 1 WHERE id = ?");
     while (rs->next()) {
+        uint64_t id = rs->getUInt64("id");
         clusterofs_t from = rs->getUInt64("from_cluster");
         clusterofs_t to   = rs->getUInt64("to_cluster");
+        memmove(&heap->storage[to], &heap->storage[from], ClusterSize);
+        ps->setUInt64(1, id);
+        ps->executeUpdate();
     }
+    ps->close();
     rs->close();
+    updateConn->close();
     conn->close();
 }
 
