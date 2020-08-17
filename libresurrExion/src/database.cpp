@@ -30,23 +30,23 @@
 #include <sstream>
 
 // "root", "root", "resurrex", 0, "/run/mysqld/mysqld.sock"
-Database::Database(const std::string &user, const std::string &pass, const std::string &sock, const std::string &db) {
-    sql::Driver* driver= sql::mariadb::get_driver_instance();
-    sql::SQLString url("jdbc:mariadb://localhost:3306/" + db);
-    sql::Properties props({{"user", user}, {"password", pass}});
-    _conn = driver->connect(url, props);
-    _conn->setAutoCommit(true);
+Database::Database(DatabaseConfig &config) : _config(config) {
 }
+
 Database::~Database() {
-    _conn->close();
-    _conn = nullptr;
+}
+
+sql::Connection* Database::getConnection() {
+    sql::Driver* driver= sql::mariadb::get_driver_instance();
+    sql::Connection *conn = driver->connect(_config.url, _config.props);
+    return conn;
 }
 
 static constexpr clusterofs_t NumClusters = 15260537;
 
 void Database::fill_allocated_clusters() {
-
-    sql::Statement *s = _conn->createStatement();
+    sql::Connection *conn = this->getConnection();
+    sql::Statement *s = conn->createStatement();
     //sql::PreparedStatement *ps = _conn->prepareStatement("insert into cluster(cluster, allocated, file) values(?, ?, ?)");
     sql::ResultSet *rs = s->executeQuery(
                 "select entry_offset, name, data_offset, data_len, is_contiguous from file where entry_offset >= 2562102657504 order by entry_offset asc"
@@ -84,9 +84,10 @@ void Database::fill_allocated_clusters() {
 }
 
 void Database::init_cluster_table() {
-    sql::Statement *s = _conn->createStatement();
+    sql::Connection *conn = this->getConnection();
+    sql::Statement *s = conn->createStatement();
     s->executeQuery("alter table cluster disable keys");
-    sql::PreparedStatement *ps = _conn->prepareStatement("insert into cluster() values()");
+    sql::PreparedStatement *ps = conn->prepareStatement("insert into cluster() values()");
     for (clusterofs_t c = 0; c < NumClusters; ++c) {
         //ps->setUInt64(0, c);
         ps->execute();

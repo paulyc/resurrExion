@@ -27,27 +27,30 @@
 #include "types.hpp"
 
 void github::paulyc::SalvatorDatorum::consolidate_fragments(FilesystemStub &fs, Database &db) {
-    sql::Statement *s = db._conn->createStatement();
+    sql::Connection *conn = db.getConnection();
+    sql::Statement *s = conn->createStatement();
     sql::ResultSet *rs = s->executeQuery("SELECT r.from_cluster, r.to_cluster FROM relocate r ORDER BY r.from_cluster ASC");
     while (rs->next()) {
         clusterofs_t from = rs->getUInt64("from_cluster");
         clusterofs_t to   = rs->getUInt64("to_cluster");
     }
     rs->close();
+    conn->close();
 }
 
 void github::paulyc::SalvatorDatorum::rescue_music(FilesystemStub &fs, Database &db) {
+    sql::Connection *conn = db.getConnection();
     //dir = "/home/paulyc/elements";
-    sql::PreparedStatement *stmt = db._conn->prepareStatement("update file set is_copied_off = 1 where file.entity_offset = ?");
+    sql::PreparedStatement *stmt = conn->prepareStatement("update file set is_copied_off = 1 where file.entity_offset = ?");
     std::function<void(File*)> onFileCopied = [&stmt](File *f){
         stmt->setUInt64(1, f->_offset);
         stmt->executeUpdate();
     };
     //stub.parseTextLog("recovery.log");
-    sql::Statement *s = db._conn->createStatement();
+    sql::Statement *s = conn->createStatement();
     sql::ResultSet *rs = s->executeQuery("select distinct(parent_directory_offset) from file where name like '%flac' or name like '%mp3' or name like '%wav' or name like '%m4a' or name like '%aiff' or name like '%aif'");
     while (rs->next()) {
-        //mariadb::transaction_ref txref = db._conn->create_transaction();
+        //mariadb::transaction_ref txref = conn->create_transaction();
         uint64_t pdo = rs->getUInt64(1);
         Directory * d = reinterpret_cast<Directory*>(fs.loadEntityOffset(pdo, "temp"));
         if (d == nullptr) {
@@ -60,12 +63,14 @@ void github::paulyc::SalvatorDatorum::rescue_music(FilesystemStub &fs, Database 
 
     rs->close();
     stmt->close();
+    conn->close();
 }
 
 void github::paulyc::SalvatorDatorum::rescue_orphan_dirs(FilesystemStub &fs, Database &db) {
-    sql::PreparedStatement *stmt = db._conn->prepareStatement("update file set is_copied_off = 1 where file.entry_offset = ?");
-    sql::PreparedStatement *frag_stmt = db._conn->prepareStatement("update file set is_contiguous = ? where file.entry_offset = ?");
-    sql::PreparedStatement *dir_stmt = db._conn->prepareStatement("select entry_offset, parent_directory_offset from directory where entry_offset = ?");
+    sql::Connection *conn = db.getConnection();
+    sql::PreparedStatement *stmt = conn->prepareStatement("update file set is_copied_off = 1 where file.entry_offset = ?");
+    sql::PreparedStatement *frag_stmt = conn->prepareStatement("update file set is_contiguous = ? where file.entry_offset = ?");
+    sql::PreparedStatement *dir_stmt = conn->prepareStatement("select entry_offset, parent_directory_offset from directory where entry_offset = ?");
     uint64_t count = 0;
     std::function<void(File*)> onFileCopied = [&stmt, &frag_stmt, &count](File *f){
         stmt->setUInt64(1, f->_offset);
@@ -81,7 +86,7 @@ void github::paulyc::SalvatorDatorum::rescue_orphan_dirs(FilesystemStub &fs, Dat
     //mariadb::result_set_ref rs = _conn->query(
     //"select distinct(parent_directory_offset) from file where name like '%jpg' or name like '%jpeg' or name like '%png' or name like '%mov' or name like '%mp4' or name like '%avi' or name like '%wmv' or name like '%mkv'");
 
-    sql::Statement *s = db._conn->createStatement();
+    sql::Statement *s = conn->createStatement();
     sql::ResultSet *orphan_dirs = s->executeQuery(
                 "select entry_offset from directory where parent_directory_offset = 0 order by entry_offset asc"
                 );
@@ -100,6 +105,7 @@ void github::paulyc::SalvatorDatorum::rescue_orphan_dirs(FilesystemStub &fs, Dat
     dir_stmt->close();
     frag_stmt->close();
     stmt->close();
+    conn->close();
 }
 
 static void copy_files(std::list<File*> &files, uint8_t *mmap, const char *dir) {
@@ -110,10 +116,11 @@ static void copy_files(std::list<File*> &files, uint8_t *mmap, const char *dir) 
 }
 
 void github::paulyc::SalvatorDatorum::rescue_dupe_orphan_files(FilesystemStub &fs, Database &db, const char *dir) {
-    sql::Statement *s = db._conn->createStatement();
+    sql::Connection *conn = db.getConnection();
+    sql::Statement *s = conn->createStatement();
     sql::ResultSet *orphan_files = s->executeQuery(
                 "select count(*) c, name from file where parent_directory_offset = 0 group by name order by c asc");
-    sql::PreparedStatement *dupes_stmt = db._conn->prepareStatement("select entry_offset from file where name = ?");
+    sql::PreparedStatement *dupes_stmt = conn->prepareStatement("select entry_offset from file where name = ?");
     while (orphan_files->next()) {
         uint64_t count = orphan_files->getUInt64("c");
         if (count > 1) {
@@ -151,13 +158,15 @@ void github::paulyc::SalvatorDatorum::rescue_dupe_orphan_files(FilesystemStub &f
     orphan_files->close();
     dupes_stmt->close();
     s->close();
+    conn->close();
 }
 
 void github::paulyc::SalvatorDatorum::rescue_orphan_files(FilesystemStub &fs, Database &db, const char *dir) {
-    sql::Statement *s = db._conn->createStatement();
-    sql::PreparedStatement *stmt = db._conn->prepareStatement(
+    sql::Connection *conn = db.getConnection();
+    sql::Statement *s = conn->createStatement();
+    sql::PreparedStatement *stmt = conn->prepareStatement(
                 "update file set is_copied_off = 1 where file.entry_offset = ?");
-    sql::PreparedStatement *dir_stmt = db._conn->prepareStatement(
+    sql::PreparedStatement *dir_stmt = conn->prepareStatement(
                 "select entry_offset, parent_directory_offset from directory where entry_offset = ?");
     uint64_t count = 0;
     std::function<void(File*)> onFileCopied = [&stmt, &count](File *f){
@@ -186,4 +195,5 @@ void github::paulyc::SalvatorDatorum::rescue_orphan_files(FilesystemStub &fs, Da
     dir_stmt->close();
     stmt->close();
     s->close();
+    conn->close();
 }

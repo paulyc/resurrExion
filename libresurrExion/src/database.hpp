@@ -30,6 +30,7 @@
 
 #include <string>
 #include <memory>
+#include <utility>
 
 #include <mariadbcpp/ConnCpp.h>
 
@@ -113,17 +114,34 @@ struct Cluster
 
 }
 
+struct DatabaseConfig
+{
+    DatabaseConfig(const std::string &user, const std::string &pass, const std::string &sock, const std::string &db)
+        : url("jdbc:mariadb://localhost:3306/" + db),
+          props({{"user", user}, {"password", pass}})
+    {
+        sql::SQLString url("jdbc:mariadb://localhost:3306/" + db);
+        sql::Properties props({{"user", user}, {"password", pass}});
+    }
+
+    sql::SQLString url;
+    sql::Properties props;
+};
+
 class Database
 {
 public:
-    Database(const std::string &user, const std::string &pass, const std::string &sock, const std::string &db);
+    Database(const std::string &user, const std::string &pass, const std::string &sock, const std::string &db)
+        : _config(DatabaseConfig(user, pass, sock, db)) {}
+    Database(DatabaseConfig &config);
     ~Database();
 
     void fill_allocated_clusters();
     void init_cluster_table();
     void consolidate_unaccounted_clusters();
+    sql::Connection* getConnection();
 //private:
-    sql::Connection *_conn;
+    DatabaseConfig _config;
     FilesystemStub _stub;
 };
 
