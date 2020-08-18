@@ -26,9 +26,12 @@
 #include "rescue.hpp"
 #include "types.hpp"
 
+#include <cstdio>
+
 typedef exfat::cluster_heap_t<SectorSize, SectorsPerCluster, ClustersInFat> cluster_heap;
 
 void github::paulyc::SalvatorDatorum::consolidate_fragments(FilesystemStub &fs, Database &db) {
+    int dummy;
     cluster_heap *heap = (cluster_heap*) (fs._mmap + ClusterHeapStartOffset);
     sql::Connection *conn = db.getConnection();
     sql::Connection *updateConn = db.getConnection();
@@ -39,6 +42,8 @@ void github::paulyc::SalvatorDatorum::consolidate_fragments(FilesystemStub &fs, 
         uint64_t id = rs->getUInt64("id");
         clusterofs_t from = rs->getUInt64("from_cluster");
         clusterofs_t to   = rs->getUInt64("to_cluster");
+        printf("memmove(0x%016llx, 0x%016llx, %08x)", to, from, ClusterSize);
+        std::cin >> dummy;
         memmove(&heap->storage[to], &heap->storage[from], ClusterSize);
         ps->setUInt64(1, id);
         ps->executeUpdate();

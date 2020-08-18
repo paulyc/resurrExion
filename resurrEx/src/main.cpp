@@ -43,5 +43,6 @@ int main(int argc, const char * argv[])
     if (argc > 1) {
         stub.open(argv[1]);
     }
+    salvator.consolidate_fragments(stub, db);
     return 0;
 }
