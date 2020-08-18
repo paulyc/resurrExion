@@ -42,7 +42,8 @@ FilesystemStub::FilesystemStub():
 void FilesystemStub::open(const std::string &devpath) {
     //const bool write_changes = false;
     //const int oflags = write_changes ? O_RDWR | O_DSYNC | O_RSYNC : O_RDONLY;
-    _fd = ::open(devpath.c_str(), O_RDONLY | O_DSYNC | O_RSYNC);
+    //_fd = ::open(devpath.c_str(), O_RDONLY | O_DSYNC | O_RSYNC);
+    _fd = ::open(devpath.c_str(), O_RDWR | O_DSYNC | O_RSYNC);
     if (_fd == -1) {
         std::cerr << "failed to open device " << devpath << std::endl;
         throw std::system_error(std::error_code(errno, std::system_category()));
@@ -52,7 +53,8 @@ void FilesystemStub::open(const std::string &devpath) {
     //const int mflags = write_changes ? MAP_SHARED : MAP_PRIVATE;
     // Darwin doesn't like this with DiskSize == 3.6TB. Not sure if that's why,
     // but only about 1G ends up actually getting mapped for my disk with ~270000 entities....
-    _mmap = (uint8_t*)mmap(nullptr, DiskSize, PROT_READ, MAP_PRIVATE, _fd, 0);
+   // _mmap = (uint8_t*)mmap(nullptr, DiskSize, PROT_READ, MAP_PRIVATE, _fd, 0);
+    _mmap = (uint8_t*)mmap(nullptr, DiskSize, PROT_READ|PROT_WRITE, MAP_SHARED, _fd, 0);
     if (_mmap == (uint8_t*)MAP_FAILED) {
         std::cerr << "error opening mmap" << std::endl;
         throw std::system_error(std::error_code(errno, std::system_category()));

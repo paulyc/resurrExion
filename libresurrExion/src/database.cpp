@@ -42,8 +42,6 @@ sql::Connection* Database::getConnection() {
     return conn;
 }
 
-static constexpr clusterofs_t NumClusters = 15260537;
-
 void Database::fill_allocated_clusters() {
     sql::Connection *conn = this->getConnection();
     sql::Statement *s = conn->createStatement();

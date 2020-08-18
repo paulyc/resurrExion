@@ -38,11 +38,9 @@
 int main(int argc, const char * argv[])
 {
     github::paulyc::SalvatorDatorum salvator;
-    Database d("root", "root", "/run/mysqld/mysqld.sock", "resurrex");
+    Database db("root", "root", "/run/mysqld/mysqld.sock", "resurrex");
     FilesystemStub stub;
-    if (argc > 1) {
-        stub.open(argv[1]);
-    }
+    stub.open(argc == 1 ? "/dev/sdb" : argv[1]);
     salvator.consolidate_fragments(stub, db);
     return 0;
 }

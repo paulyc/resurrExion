@@ -28,29 +28,65 @@
 
 #include <cstdio>
 
-typedef exfat::cluster_heap_t<SectorSize, SectorsPerCluster, ClustersInFat> cluster_heap;
+typedef uint8_t cluster[512*512];
+cluster * cluster_heap = reinterpret_cast<cluster*>(ClusterHeapStartDiskOffset);
+cluster * heap_end = cluster_heap + NumClusters;
+
+inline void debug_memcpy(uint8_t *to, uint8_t *from, size_t bytes, bool dry_run=false) {
+    if (!dry_run) {
+        for (;bytes > 0;--bytes) {
+	    // prevent CPU, or at least mine, from throwing around interrupts that are going unhandled
+	    // because someone's got a bug causing memcpy and memmove to execute SIMD instructions with
+	    // wildly misaligned addresses.
+	    // Seems like it only happens when the mmaped device is read-only though, i.e., this
+	    // SHOULD fail, but not, I think, with an equally wildly misleading HW interrupt.
+	    // So, this has fulfilled its purpose of making sure only to do cache-aligned memcpys,
+	    // but still not a bad sanity check to have around particularly with the utter lack of unit testing going on here.
+	    // No, this is not exactly the most important data I'm trying to recover here :D
+	    assert((reinterpret_cast<std::uintptr_t>(to) % 512 == 0));
+	    assert((reinterpret_cast<std::uintptr_t>(from) % 512 == 0));
+	    if ((reinterpret_cast<std::uintptr_t>(to) % 64) != 0 || (reinterpret_cast<std::uintptr_t>(from) % 64) != 0) {
+                *to++ = *from++;
+            } else {
+                break;
+            }
+        }
+        memcpy(to, from, bytes);
+    }
+}
 
 void github::paulyc::SalvatorDatorum::consolidate_fragments(FilesystemStub &fs, Database &db) {
-    int dummy;
-    cluster_heap *heap = (cluster_heap*) (fs._mmap + ClusterHeapStartOffset);
+    cluster * cluster_heap = reinterpret_cast<cluster*>(fs._mmap + ClusterHeapStartDiskOffset);
+    cluster * heap_end = cluster_heap + NumClusters;
+    std::cout << "ClusterHeapStartDiskOffset = " << ClusterHeapStartDiskOffset << " % 512 == " << ClusterHeapStartDiskOffset % 512 << " % 512*512 == " << ClusterHeapStartDiskOffset % (512*512) << std::endl;
+    std::cout <<
+        "cluster_heap = " << reinterpret_cast<std::uintptr_t>(cluster_heap) <<
+        " % 512 == " << reinterpret_cast<std::uintptr_t>(cluster_heap) % 512 <<
+	" % 512*512 == " << reinterpret_cast<std::uintptr_t>(cluster_heap) % (512*512) << 
+        std::endl;
+
     sql::Connection *conn = db.getConnection();
-    sql::Connection *updateConn = db.getConnection();
+    //sql::Connection *updateConn = db.getConnection();
     sql::Statement *s = conn->createStatement();
     sql::ResultSet *rs = s->executeQuery("SELECT r.id, r.from_cluster, r.to_cluster FROM relocate r WHERE r.status = 0 ORDER BY r.from_cluster ASC");
-    sql::PreparedStatement *ps = updateConn->prepareStatement("UPDATE relocate SET status = 1 WHERE id = ?");
+    //sql::PreparedStatement *ps = updateConn->prepareStatement("UPDATE relocate SET status = 1 WHERE id = ?");
     while (rs->next()) {
         uint64_t id = rs->getUInt64("id");
         clusterofs_t from = rs->getUInt64("from_cluster");
         clusterofs_t to   = rs->getUInt64("to_cluster");
-        printf("memmove(0x%016llx, 0x%016llx, %08x)", to, from, ClusterSize);
-        std::cin >> dummy;
-        memmove(&heap->storage[to], &heap->storage[from], ClusterSize);
-        ps->setUInt64(1, id);
-        ps->executeUpdate();
+        printf("0x%08x -> 0x%08x memmove(%p, %p)\n", from, to, &cluster_heap[to], &cluster_heap[from]);
+//        continue;
+        //std::cin >> dummy;
+//	memcpy(&cluster_heap[to], &cluster_heap[from], sizeof(cluster));
+	debug_memcpy((uint8_t*)&cluster_heap[to], (uint8_t*)&cluster_heap[from], sizeof(cluster));
+        // was debugging, stupid bug mentioned in this function!
+	//memmove_cluster((uint8_t*)(heap+to), (uint8_t*)(heap+from), (unsigned int)ClusterSize);
+        //ps->setUInt64(1, id);
+        //ps->executeUpdate();
     }
-    ps->close();
+    //ps->close();
     rs->close();
-    updateConn->close();
+    s->close();
     conn->close();
 }
 

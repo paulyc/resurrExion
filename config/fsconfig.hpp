@@ -56,5 +56,11 @@ constexpr static sectorofs_t ClusterHeapStartSector = 0x283D8; // relative to pa
 constexpr static size_t ClusterHeapStartSectorRelWholeDisk = PartitionStartSector + ClusterHeapStartSector;
 constexpr static size_t ClusterHeapStartOffset = ClusterHeapStartSectorRelWholeDisk * SectorSize;
 constexpr static byteofs_t DiskSize = (NumSectors + PartitionStartSector) * SectorSize;
+constexpr static clusterofs_t NumClusters = 15260537;
+constexpr static size_t ClusterHeapStartDiskOffset = 294125568; // (0x64028+0x283D8)*512
+
+inline sectorofs_t clusterToSector(clusterofs_t cluster) {
+	return cluster * SectorSize + PartitionStartSector + ClusterHeapStartSector;
+}
 
 #endif /* _github_paulyc_exfat_fsconfig_hpp_ */
